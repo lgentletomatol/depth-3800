@@ -1,0 +1,1045 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="수심 3,800m 침몰선에서 헬멧 라이다만으로 탈출 수단을 찾는 1인칭 공포게임. 잠수할 때마다 괴물과 부품 위치가 바뀐다.">
+<meta property="og:title" content="수심 3800">
+<meta property="og:description" content="라이다로만 보는 1인칭 심해 공포게임. 키보드와 마우스 필요.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#010407">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23010407'/%3E%3Ccircle cx='32' cy='32' r='20' fill='none' stroke='%238ff3e2' stroke-width='3' stroke-dasharray='2 5'/%3E%3Ccircle cx='32' cy='32' r='4' fill='%23ff4458'/%3E%3C/svg%3E">
+<title>수심 3800</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed first-person point cloud seen through a diving helmet; gauges sit low like a dive computer; story panels are a narrow column on the left, the way a dive log is written. */
+:root{
+  --bg:#010407;
+  --lidar:#8ff3e2;
+  --lidar-dim:#245a58;
+  --ink:#cfe6e4;
+  --ink-dim:#6c8f8e;
+  --warn:#ff4458;
+  --amber:#ffb648;
+  --ok:#86ffb4;
+  --line:rgba(143,243,226,.18);
+  --font-display:"Hahmlet","Nanum Myeongjo","AppleMyungjo",serif;
+  --font-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --font-mono:"IBM Plex Mono","IBM Plex Sans KR",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);overflow:hidden;font-family:var(--font-ui);-webkit-user-select:none;user-select:none}
+#game{position:fixed;inset:0;background:var(--bg)}
+#game canvas{display:block;width:100%;height:100%}
+#static{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;opacity:0;image-rendering:pixelated;mix-blend-mode:screen}
+.visor{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 75% 68% at 50% 50%,rgba(0,0,0,0) 62%,rgba(0,0,0,.9) 100%)}
+.scan{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.2) 2px 3px)}
+#hurt{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(255,40,60,0) 35%,rgba(255,40,60,.42) 100%)}
+#black{position:fixed;inset:0;pointer-events:none;background:#000;opacity:0}
+#slit{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom,#000 0 13%,rgba(0,0,0,0) 13% 16%,#000 16% 29%,rgba(0,0,0,0) 29% 32%,#000 32% 100%)}
+
+#hud{position:fixed;inset:0;pointer-events:none;font-family:var(--font-mono);font-size:12px;letter-spacing:.03em;--gx:max(18px,env(safe-area-inset-left,0px));--gr:max(18px,env(safe-area-inset-right,0px));--gt:max(16px,env(safe-area-inset-top,0px));--gb:max(16px,env(safe-area-inset-bottom,0px))}
+.tl{position:absolute;top:var(--gt);left:var(--gx);display:grid;gap:4px;max-width:min(48vw,420px)}
+.unit{color:var(--lidar);font-weight:500;letter-spacing:.14em}
+#routes{display:grid;gap:3px;font-family:var(--font-ui);font-size:12.5px;color:var(--ink-dim)}
+#routes b{font-weight:500;color:var(--ink)}
+#routes .have{color:var(--amber)} #routes .in{color:var(--ok)} #routes .ready b{color:var(--ok)}
+.tr{position:absolute;top:var(--gt);right:var(--gr);text-align:right;display:grid;gap:4px;color:var(--ink-dim)}
+#loc{color:var(--ink);font-family:var(--font-ui);font-size:13px}
+#place{position:absolute;top:22%;left:0;right:0;text-align:center;font-family:var(--font-display);font-weight:500;font-size:clamp(20px,3vw,30px);letter-spacing:.45em;text-indent:.45em;color:var(--ink);opacity:0}
+#place.on{animation:place 3s ease-out}
+@keyframes place{0%{opacity:0;letter-spacing:.8em}15%{opacity:.8}70%{opacity:.8}100%{opacity:0}}
+#reticle{position:absolute;left:50%;top:50%;border:1px solid rgba(143,243,226,.22);border-radius:50%;transform:translate(-50%,-50%)}
+#reticle::after{content:"";position:absolute;left:50%;top:50%;width:3px;height:3px;background:var(--lidar);transform:translate(-50%,-50%)}
+#prompt{position:absolute;left:50%;top:calc(50% + 70px);transform:translateX(-50%);white-space:nowrap;font-family:var(--font-ui);font-size:13px;color:var(--ink);background:rgba(1,4,7,.72);border:1px solid var(--line);padding:4px 11px}
+#prompt kbd{font-family:var(--font-mono);color:var(--ok);margin-right:7px}
+#hold{position:absolute;left:50%;top:calc(50% + 104px);transform:translateX(-50%);width:180px;height:5px;border:1px solid var(--amber)}
+#hold i{position:absolute;inset:0 auto 0 0;background:var(--amber);width:0}
+#toasts{position:absolute;bottom:calc(var(--gb) + 70px);left:50%;transform:translateX(-50%);display:grid;gap:5px;text-align:center;width:min(660px,92vw);font-family:var(--font-ui);font-size:13.5px;line-height:1.5}
+#toasts div{transition:opacity .9s;text-shadow:0 0 10px #000,0 0 3px #000}
+#toasts .r{color:var(--lidar)} #toasts .s{color:var(--amber)} #toasts .w{color:var(--warn)} #toasts .g{color:var(--ok)}
+.bl{position:absolute;bottom:var(--gb);left:var(--gx);display:grid;gap:7px;width:min(250px,44vw)}
+.gauge{display:grid;grid-template-columns:52px 1fr 40px;gap:8px;align-items:center;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+.gauge b{font-weight:400;color:var(--ink);text-align:right}
+.bar{height:5px;border:1px solid var(--lidar-dim);position:relative}
+.bar i{position:absolute;inset:0 auto 0 0;width:100%;background:var(--lidar)}
+.bar.o2 i{background:var(--ok)} .bar.low i{background:var(--warn)}
+#suit{color:var(--ok)} #suit.bad{color:var(--warn)}
+.br{position:absolute;bottom:var(--gb);right:var(--gr);text-align:right;display:grid;gap:4px;color:var(--ink-dim)}
+.br b{font-weight:400;color:var(--ink)}
+#mode{color:var(--amber);letter-spacing:.16em}
+
+.screen{position:fixed;inset:0;display:grid;align-items:center;padding-block:28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));overflow:auto;background:linear-gradient(100deg,rgba(1,4,7,.95) 0%,rgba(1,4,7,.84) 55%,rgba(1,4,7,.5) 100%)}
+.col{width:100%;max-width:580px;margin-left:clamp(0px,7vw,120px);display:grid;gap:18px}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.3em;color:var(--lidar)}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(52px,10vw,112px);line-height:1;margin:0;color:#f0fbfa;letter-spacing:.02em;text-shadow:0 0 30px rgba(143,243,226,.35)}
+h1 small{display:block;font-family:var(--font-mono);font-weight:400;font-size:12px;letter-spacing:.5em;color:var(--ink-dim);margin-top:16px;text-shadow:none}
+h2{font-family:var(--font-display);font-weight:700;font-size:clamp(30px,5.4vw,54px);margin:0;line-height:1.15;text-wrap:balance}
+p{margin:0}
+.lead{font-size:15px;line-height:1.85;max-width:54ch}
+.lead em{font-style:normal;color:var(--warn)}
+.keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px 20px;margin:0;padding:0;list-style:none;font-size:13px}
+.keys li{display:flex;gap:10px;align-items:baseline;min-width:0}
+kbd{font-family:var(--font-mono);font-size:11px;color:var(--lidar);border:1px solid var(--lidar-dim);padding:1px 6px;min-width:54px;text-align:center;flex:none}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+button{font-family:var(--font-ui);font-size:15px;font-weight:600;letter-spacing:.1em;border:1px solid var(--lidar);background:var(--lidar);color:#02100e;padding:11px 24px;cursor:pointer;border-radius:0}
+button.ghost{background:transparent;color:var(--lidar)}
+button:hover{filter:brightness(1.15)}
+button:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.note{font-size:12px;color:var(--ink-dim);line-height:1.6}
+.stats{font-family:var(--font-mono);font-size:12px;color:var(--ink-dim);line-height:1.9;font-variant-numeric:tabular-nums}
+#noteWho{font-family:var(--font-mono);font-size:11px;letter-spacing:.2em;color:var(--amber)}
+#noteTitle{font-family:var(--font-display);font-weight:700;font-size:clamp(24px,4vw,34px);color:#f0fbfa}
+#noteBody{white-space:pre-wrap;font-size:15px;line-height:1.9;max-width:50ch;border-left:1px solid var(--line);padding-left:18px}
+#archive{display:grid;gap:4px;max-height:34vh;overflow:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding-block:8px}
+#archive button{all:unset;cursor:pointer;font-size:13.5px;padding:5px 4px;color:var(--ink);display:flex;gap:12px}
+#archive button:hover,#archive button:focus-visible{color:var(--lidar);background:rgba(143,243,226,.06)}
+#archive span{font-family:var(--font-mono);font-size:11px;color:var(--ink-dim);width:24px;flex:none}
+#archive .none{color:var(--ink-dim);font-size:13px;padding:5px 4px}
+#dead h2{color:var(--warn)} #won h2{color:var(--ok)}
+#mapscr{background:rgba(1,4,7,.94);padding:0;display:block}
+#mapcv{position:absolute;inset:0;width:100%;height:100%}
+#mapcap{position:absolute;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));display:flex;gap:8px 22px;flex-wrap:wrap;justify-content:space-between;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-dim)}
+#mapcap i{font-style:normal;color:var(--ink)}
+@media (prefers-reduced-motion:reduce){#place.on{animation-duration:.01s;opacity:.8}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<canvas id="static" width="128" height="72"></canvas>
+<div class="scan"></div><div class="visor"></div><div id="hurt"></div><div id="slit" hidden></div><div id="black"></div>
+
+<div id="hud" hidden>
+  <div class="tl"><div class="unit">흑조호 선내 · 수심 3,800 m</div><div id="routes"></div></div>
+  <div class="tr"><div id="loc"></div><div id="notecount">기록 0 / 7</div></div>
+  <div id="place"></div>
+  <div id="reticle"></div>
+  <div id="prompt" hidden></div>
+  <div id="hold" hidden><i id="holdFill"></i></div>
+  <div id="toasts"></div>
+  <div class="bl">
+    <div class="gauge"><span>산소</span><div class="bar o2" id="o2Bar"><i id="o2Fill"></i></div><b id="o2Txt">100</b></div>
+    <div class="gauge"><span>스캐너</span><div class="bar" id="batBar"><i id="batFill"></i></div><b id="batTxt">100</b></div>
+    <div id="suit">잠수복 정상</div>
+  </div>
+  <div class="br"><div id="mode"></div><div>비콘 <b id="bcn">0</b> · 수리 키트 <b id="kit">0</b></div></div>
+</div>
+
+<div id="title" class="screen">
+  <div class="col">
+    <div class="eyebrow">심해 채굴 지원선 흑조호 · 침몰 19일째</div>
+    <h1>수심 3800<small>DEPTH 3800 · LIDAR DIVE</small></h1>
+    <p class="lead">당신은 대기압 잠수복을 입고 가라앉은 배 안으로 들어간 인양 잠수사다. 선체가 기울면서 인양 케이블이 끊겼다. 부유물 때문에 조명은 눈앞을 하얗게 만들 뿐이라, 볼 수 있는 것은 헬멧 라이다가 찍어 주는 점뿐이다.<br><br>산소가 떨어지기 전에 올라갈 방법을 찾아라. <em>배 안에는 채굴공에서 따라 올라온 것이 있다. 무엇인지는 잠수할 때마다 다르다.</em></p>
+    <ul class="keys">
+      <li><kbd>WASD</kbd>이동</li>
+      <li><kbd>마우스</kbd>시점</li>
+      <li><kbd>좌클릭</kbd>집중 스캔 (누르고 있기)</li>
+      <li><kbd>우클릭</kbd>전방위 펄스</li>
+      <li><kbd>휠</kbd>빔 폭</li>
+      <li><kbd>Shift</kbd>달리기 (소음, 산소 소모)</li>
+      <li><kbd>C</kbd>살금살금 걷기</li>
+      <li><kbd>F</kbd>미끼 비콘 투척</li>
+      <li><kbd>E</kbd>문 · 줍기 · 숨기 · 설치</li>
+      <li><kbd>Tab</kbd>선내 지도</li>
+      <li><kbd>Esc</kbd>일시정지 · 기록</li>
+    </ul>
+    <div class="row">
+      <button type="button" id="btnStart">잠수 시작</button>
+      <span class="note">헤드폰 권장 · 키보드와 마우스 필요 · 한 판 15~25분</span>
+    </div>
+    <p class="stats" id="career"></p>
+  </div>
+</div>
+
+<div id="noteview" class="screen" hidden>
+  <div class="col" style="gap:14px">
+    <div id="noteWho"></div><div id="noteTitle"></div><div id="noteBody"></div>
+    <div class="row"><button type="button" id="btnNoteClose">닫기</button></div>
+  </div>
+</div>
+
+<div id="pause" class="screen" hidden>
+  <div class="col">
+    <div class="eyebrow">일시정지</div>
+    <h2>주운 기록</h2>
+    <div id="archive"></div>
+    <div class="row">
+      <button type="button" id="btnResume">계속</button>
+      <button type="button" id="btnMute" class="ghost">소리 끄기</button>
+      <button type="button" id="btnQuit" class="ghost">잠수 포기</button>
+    </div>
+    <p class="note">잠수 중에는 저장되지 않는다. 죽으면 배의 막힌 문, 부품 위치, 그리고 배 안의 그것이 바뀐 채로 다시 시작한다.</p>
+  </div>
+</div>
+
+<div id="dead" class="screen" hidden>
+  <div class="col">
+    <div class="eyebrow" id="deadEyebrow">교신 두절</div>
+    <h2 id="deadTitle">돌아오지 못했다</h2>
+    <p class="lead" id="deadMsg"></p>
+    <p class="stats" id="deadStats"></p>
+    <div class="row"><button type="button" id="btnRetry">다시 잠수</button><button type="button" id="btnDeadTitle" class="ghost">타이틀로</button></div>
+  </div>
+</div>
+
+<div id="won" class="screen" hidden>
+  <div class="col">
+    <div class="eyebrow" id="wonEyebrow"></div>
+    <h2 id="wonTitle">수면</h2>
+    <p class="lead" id="wonMsg"></p>
+    <p class="stats" id="wonStats"></p>
+    <div class="row"><button type="button" id="btnAgain">다시 잠수</button><button type="button" id="btnWonTitle" class="ghost">타이틀로</button></div>
+  </div>
+</div>
+
+<div id="mapscr" class="screen" hidden>
+  <canvas id="mapcv"></canvas>
+  <div id="mapcap"><span>선내 지도 · 라이다가 닿은 곳만 기록됨</span><span><i>◆</i> 탈출 수단 &nbsp; <i>●</i> 발견한 물건 &nbsp; <i>▮</i> 사물함 &nbsp; <i>▲</i> 나 &nbsp;·&nbsp; Tab 닫기</span></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+"use strict";
+const DATA = {"start":[53,34],"sub":[53,36],"capsule":[7,42],"winch":[99,22],"vents":[[20,22],[50,22],[72,22],[86,22],[29,33],[75,32],[50,14],[68,12],[30,17],[10,14],[96,16],[40,42],[53,28],[84,17]],"spots":[[56,26],[22,11],[28,12],[33,10],[40,12],[37,17],[51,11],[51,16],[56,11],[68,8],[79,13],[86,18],[84,8],[97,12],[100,29],[93,25],[38,26],[24,38],[40,30],[18,26],[5,12],[5,25],[12,31],[3,30],[68,31],[82,37],[63,25],[85,33],[12,42],[58,42],[28,42],[60,23],[40,22],[23,18],[75,6],[92,33]],"corpses":[[22,12,1],[34,12,0],[37,18,1],[52,17,0],[57,10,1],[38,29,1],[78,14,0],[100,28,1],[69,32,0],[61,22,1],[13,42,0],[6,18,1],[83,7,0],[24,34,1],[94,20,0],[52,27,1]],"debris":[[23,30],[29,34],[36,29],[40,38],[41,22],[67,22],[28,42],[57,42],[75,38],[10,30]],"signs":[[31,20,32,20,"-y","거주구"],[32,24,31,24,"+y","화물창"],[55,24,54,24,"+y","문풀 격납고"],[54,20,55,20,"-y","의무실"],[71,20,72,20,"-y","시료 분석실"],[77,24,76,24,"+y","펌프실"],[90,23,90,24,"+x","조타실"],[14,21,14,20,"-x","기관실"],[55,31,54,31,"+y","문풀"],[31,40,32,40,"-y","화물창"],[76,40,77,40,"-y","펌프실"],[6,41,6,40,"-x","부상 캡슐"],[90,21,90,20,"-x","중앙 통로"],[51,24,52,24,"-y","중앙 통로"],[98,10,99,10,"-y","윈치 제어"]],"rows":["                                                                                                          ","                                                                                                          ","                                                                                                          ","                                                                                                          ","                                                                #########################                 ","                                                                #ooo....#c......G.......#                 ","                                                                #.......#.......G.t...t.#                 ","                  #########################                     #.......#.......G.......#                 ","                  #o.k.o#o.k.o#o.k.o#o.k.o#   ###############   #.......#.......G.......#                 ","                  #o...o#o...o#o...o#o...o#   #c....ooG.....#   #.......#.......G.....t.#                 ","  #############   #.....#.....#.....#.....#   #.oo....G...oo#   #oo.....#....#..G.......# ##############  ","  #cc........c#   #.....#.....#.....#.....#   #.......G.....#   #.......#....#..GGGDGGGG# #k...........#  ","  #...........#   #.....#.....#.....#.....#   #.......G.....#   #.......#.oo.#..........# #............#  ","  #...........#   #o....#o....#o....#o....#   #koo....G.....#   #.......#....#.........o# #..ooo...ooo.#  ","  #...........#   #.....#.....#.....#.....#   #.......GGGDGG#   #.......#....#..........# #............#  ","  #..c........#   ###D#####D#####D#####D#######.............#####............#......oo..# #............#  ","  #.........c.#   #cc.....k.......c.......#...#.oo.........k#...#............#..........# #............#  ","  #.........c.#   #.......................D...D.............D...D............#..........# #..........o.#  ","  #...........#   #.......................#...#.............#...#............#.oo.......# #..........o.#  ","  #...........#   #.....................cc#...#...........cc#...#cc.k........#c........k# #..........o.#  ","  #k...t.t....################D######################D################D####################.....o......#  ","  #.o...t.....#.cc..........................#.............c...#...........................#.....o......#  ","  #.o..ttt....D.............................D.................D...........................D.......o....#  ","  #.o...t.....#.....................c.......#.................#.......................cc..#.....o......#  ","  #....t.t....################D######################D#####################D###############.....o......#  ","  #...........# #........................k#    #..........k#  #.......................cc# #..........o.#  ","  #...........# #.........................#    #...........#  #.........................# #..........o.#  ","  #...........# #..cc.c..ccc.....ccc..cc..#    #...........#  #kt.t.t.t.t.....t.t.t...t.# #..........o.#  ","  #c..........# #..cccc...cc.....ccc..c...#    #.........c.#  #.........................# #............#  ","  #...........# #.........................#    #........cc.#  #.t.t.t...t.....t.t.t.t.t.# #............#  ","  #...........# #.........................#    #c..........#  #.........................# #............#  ","  #...........# #..cccc..c.c.....ccc..cc..#    ######D######  #.t.t...t.t.....t.t.t.t.t.# #..ooo...ooo.#  ","  #...........# #..ccc...ccc......cc..cc..#       #.....#     #.........................# #............#  ","  #cc........k# #.........................#       #.....#     #.t.t.t.t.t.....t...t.t.t.# #...........k#  ","  ######D###### #.........................#       #.....#     #.........................# ##############  ","      #...#     #..cccc..ccc.....c.c...c..#       #.....#     #.t...t.t.t.....t.t.t.t.t.#                 ","      #...#     #...ccc..ccc.....ccc..cc..#       #.....#     #.........................#                 ","      #...#     #.........................#       #######     #.t.t.t.t.t.....t.t...t.t.#                 ","      #...#     #.........................#                   #.........................#                 ","      #...#     #k........................#                   #cc......................k#                 ","      #...####################D############################################D#############                 ","      #.............cc..................k.........................c.............#                         ","      #.........................................................................#                         ","      #.....................................cc........................k.........#                         ","      ###########################################################################                         ","                                                                                                          ","                                                                                                          ","                                                                                                          "],"doors":[[14,22],[8,34],[30,20],[21,15],[27,15],[33,15],[39,15],[42,17],[46,17],[53,20],[60,17],[64,17],[70,20],[90,22],[30,24],[30,40],[53,24],[53,31],[75,24],[75,40],[44,22],[62,22],[57,14],[83,11]],"jam":[[44,22],[62,22],[42,17],[60,17],[30,40],[75,40],[30,24],[75,24],[8,34],[64,17]]};
+// ================================================================ text
+const NOTES = {
+  1: { who: "선장 · 항해 일지", title: "배를 버린다", body: "채굴공 4번에서 올린 시추관에 무언가 붙어 올라왔다. 갑판원 둘이 사라졌다.\n\n배를 버린다. 올라갈 방법은 셋이다.\n문풀의 구조 잠수정.\n선미 하부 통로 끝의 부상 캡슐.\n조타실의 인양 윈치.\n\n부품이 전부 빠져 있다. 누군가 숨겼다. 그것이 배를 떠나지 못하게 하려고." },
+  2: { who: "기관장 · 정비 메모", title: "잠수정", body: "구조 잠수정은 배터리 셀과 퓨즈가 있어야 움직인다.\n\n둘 다 끼우고 기동 레버를 잡고 있어야 한다. 기동에는 시간이 걸리고, 그동안 배 전체에 소리가 울린다.\n\n기동을 시작했으면 손을 떼지 마라." },
+  3: { who: "갑판장 · 장비 목록", title: "캡슐과 윈치", body: "부상 캡슐: 분리 핀, 압축공기 탱크.\n인양 윈치: 샤클, 윈치 핸들.\n\n세 가지를 다 고칠 필요는 없다. 하나만 고치면 올라간다.\n먼저 찾은 부품이 어느 쪽 것인지 보고 정해라." },
+  4: { who: "생물학자 · 관찰 기록 A", title: "울대", body: "눈이 없다. 대신 듣는다.\n\n뛰면 온다. 문을 여닫아도 온다. 살금살금 걸으면 코앞을 지나가도 모른다.\n레이저에는 반응하지 않는다. 마음껏 비춰도 된다.\n\n닫힌 문은 부수고 들어온다. 그 소리로 어디쯤 있는지 알 수 있다." },
+  5: { who: "생물학자 · 관찰 기록 B", title: "천장꾼", body: "천장과 환기구로 다닌다. 바닥만 보면 영영 못 본다.\n\n빛에 반응한다. 라이다 레이저도 빛이다.\n따라붙으면 비추는 것을 멈추고 숨어라. 어둠 속에서는 우리를 찾지 못한다.\n\n환기구 덮개가 떨어지는 소리가 나면 근처에 내려온 것이다." },
+  6: { who: "생물학자 · 관찰 기록 C", title: "흉내", body: "물건을 흉내 낸다. 아까 없던 사물함, 아까 없던 상자.\n\n가까이 가면 덮친다. 두 걸음 안으로 들어가지 마라.\n멀리서 오래 비추면 견디지 못하고 모습을 드러낸 뒤 달아난다.\n\n지도를 믿어라. 지도에 없던 물건이 거기 있다면, 그건 물건이 아니다." },
+  7: { who: "통신사 · 마지막 무전", title: "붉은 점", body: "움직이는 것은 붉게 찍힌다. 멈춘 것은 다른 것과 똑같이 찍힌다.\n\n그러니 무서운 건 붉은 점이 아니다.\n붉었다가 하얘진 점이다.\n\n떠다니는 잔해도, 떠다니는 사람도 붉게 찍힌다. 전부 그것은 아니다. 하지만 전부 아닌 것도 아니다." }
+};
+const NNOTES = 7;
+const ROOMS = [["문풀", 50, 31, 56, 37], ["문풀 격납고", 47, 24, 59, 31], ["기관실", 2, 10, 14, 34], ["거주구", 18, 7, 42, 20], ["의무실", 46, 8, 60, 20], ["시료 분석실", 64, 4, 88, 20], ["조타실", 90, 10, 103, 34], ["화물창", 16, 24, 42, 40], ["펌프실", 62, 24, 88, 40], ["중앙 통로", 14, 20, 90, 24], ["연결 통로", 42, 15, 46, 20], ["연결 통로", 60, 15, 64, 20], ["하부 통로", 6, 34, 80, 44]];
+const PARTS = { battery: "배터리 셀", fuse: "퓨즈", pin: "분리 핀", air: "압축공기 탱크", shackle: "샤클", handle: "윈치 핸들" };
+const ROUTES = [
+  { id: "sub", name: "구조 잠수정", needs: ["battery", "fuse"], hold: 12, where: "문풀" },
+  { id: "capsule", name: "부상 캡슐", needs: ["pin", "air"], hold: 10, where: "하부 통로 선미 끝" },
+  { id: "winch", name: "인양 윈치", needs: ["shackle", "handle"], hold: 14, where: "조타실" }
+];
+const MON_NAME = { A: "울대", B: "천장꾼", C: "흉내" };
+
+// ================================================================ utils
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const hyp = Math.hypot, rnd = Math.random, TAU = Math.PI * 2;
+let seed = 5; const srand = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+const frac = v => v - Math.floor(v);
+const pick = a => a[(rnd() * a.length) | 0];
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+// ================================================================ static world
+const W = DATA.rows[0].length, H = DATA.rows.length, WH = 2.7, EYE = 1.55;
+const T_SPACE = 0, T_FLOOR = 1, T_WALL = 2, T_GLASS = 3, T_DOOR = 4;
+const K = { WALL: 1, FLOOR: 2, CEIL: 3, GLASS: 4, DOOR: 5, JAM: 6, CRATE: 7, FURN: 8, TANK: 9, LOCKER: 10, PIPE: 11, BODY: 12, ITEM: 13, STATION: 14, VENT: 15, MON: 16, DEBRIS: 17, BEACON: 18, SNOW: 19 };
+const tile = new Uint8Array(W * H), blockPath = new Uint8Array(W * H), known = new Uint8Array(W * H);
+const obsCell = new Array(W * H).fill(null), doorAt = new Array(W * H).fill(null);
+const doors = [], lockers = [], stations = {}, vents = [], OBS = [];
+function addObs(o) {
+  let x0, x1, z0, z1;
+  if (o.s === 0) { x0 = o.x0; x1 = o.x1; z0 = o.z0; z1 = o.z1; } else { x0 = o.x - o.r; x1 = o.x + o.r; z0 = o.z - o.r; z1 = o.z + o.r; }
+  for (let z = Math.floor(z0); z <= Math.floor(z1 - 1e-6); z++) for (let x = Math.floor(x0); x <= Math.floor(x1 - 1e-6); x++) { const i = z * W + x; (obsCell[i] || (obsCell[i] = [])).push(o); }
+  OBS.push(o); return o;
+}
+const box = (x0, x1, y0, y1, z0, z1, kind, solid, ref) => addObs({ s: 0, x0, x1, y0, y1, z0, z1, kind, solid, ref });
+for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
+  const c = DATA.rows[z][x], i = z * W + x;
+  tile[i] = c === " " ? T_SPACE : c === "#" ? T_WALL : c === "G" ? T_GLASS : c === "D" ? T_DOOR : T_FLOOR;
+}
+const isWallT = i => tile[i] === T_WALL || tile[i] === T_SPACE;
+for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
+  const c = DATA.rows[z][x], i = z * W + x;
+  if (c === "c") { const s = .32 + srand() * .12, ox = (srand() - .5) * .1, oz = (srand() - .5) * .1, h = .55 + srand() * .5; box(x + .5 - s + ox, x + .5 + s + ox, 0, h, z + .5 - s + oz, z + .5 + s + oz, K.CRATE, 1); if (srand() < .3) box(x + .5 - s * .7, x + .5 + s * .7, h, h + .45, z + .5 - s * .7, z + .5 + s * .7, K.CRATE, 1); blockPath[i] = 1; }
+  else if (c === "o") { const h = srand() < .25 ? 1.15 : .78; box(x + .04, x + .96, h - .08, h, z + .08, z + .92, K.FURN, 1); box(x + .1, x + .9, 0, h - .08, z + .16, z + .84, K.FURN, 1); blockPath[i] = 1; }
+  else if (c === "t") { addObs({ s: 1, x: x + .5, z: z + .5, r: .36, y0: 0, y1: WH, kind: K.TANK, solid: 1 }); blockPath[i] = 1; }
+  else if (c === "k") {
+    let fx = 0, fz = 1, b;
+    if (isWallT(i - W)) { fx = 0; fz = 1; b = [x + .06, x + .94, z, z + .56]; }
+    else if (isWallT(i + W)) { fx = 0; fz = -1; b = [x + .06, x + .94, z + .44, z + 1]; }
+    else if (isWallT(i - 1)) { fx = 1; fz = 0; b = [x, x + .56, z + .06, z + .94]; }
+    else { fx = -1; fz = 0; b = [x + .44, x + 1, z + .06, z + .94]; }
+    const L = { type: "locker", x: (b[0] + b[1]) / 2, z: (b[2] + b[3]) / 2, fx, fz, ex: x + .5 + fx * .32, ez: z + .5 + fz * .32, found: false, cell: i };
+    lockers.push(L); box(b[0], b[1], 0, 1.95, b[2], b[3], K.LOCKER, 1, L); blockPath[i] = 1;
+  }
+}
+// hull ribs and overhead pipes
+for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
+  const i = z * W + x; if (tile[i] !== T_FLOOR || blockPath[i]) continue;
+  if (x % 4 === 0) { if (tile[i - W] === T_WALL) box(x + .36, x + .64, 0, WH, z, z + .18, K.WALL, 1); if (tile[i + W] === T_WALL) box(x + .36, x + .64, 0, WH, z + .82, z + 1, K.WALL, 1); }
+  if (z % 4 === 0) { if (tile[i - 1] === T_WALL) box(x, x + .18, 0, WH, z + .36, z + .64, K.WALL, 1); if (tile[i + 1] === T_WALL) box(x + .82, x + 1, 0, WH, z + .36, z + .64, K.WALL, 1); }
+}
+for (let x = 15; x < 90; x++) { if (tile[21 * W + x] === T_FLOOR) box(x, x + 1, 2.32, 2.52, 21.12, 21.34, K.PIPE, 0); if (tile[23 * W + x] === T_FLOOR && x % 3) box(x, x + 1, 2.4, 2.55, 23.7, 23.86, K.PIPE, 0); }
+for (let x = 7; x < 80; x++) if (tile[43 * W + x] === T_FLOOR) box(x, x + 1, 2.3, 2.5, 43.62, 43.86, K.PIPE, 0);
+for (const [x, z] of DATA.doors) { const d = { x, z, open: 0, target: 0, jam: false, broken: false, mesh: null, corpse: false }; doors.push(d); doorAt[z * W + x] = d; }
+for (const [x, z] of DATA.vents) { vents.push({ x: x + .5, z: z + .5 }); box(x + .18, x + .82, WH - .07, WH, z + .18, z + .82, K.VENT, 0); }
+for (const [x, z, f] of DATA.corpses) {
+  const a = srand() * TAU, dx = Math.cos(a), dz = Math.sin(a), y = f ? WH - .22 - srand() * .25 : .17;
+  for (const [d, r] of [[-.5, .13], [-.2, .2], [.1, .19], [.4, .14], [.66, .11], [.9, .09]]) addObs({ s: 2, x: x + .5 + dx * d, y: y + (f ? Math.abs(d) * -.12 : 0), z: z + .5 + dz * d, r, kind: K.BODY, solid: 0 });
+}
+(function () {
+  let [x, z] = DATA.sub; const s = stations.sub = { type: "station", id: "sub", x: x + .5, z: z + .6, found: false };
+  box(x - 1.3, x + 2.3, 0, 1.5, z + .22, z + .96, K.STATION, 1, s); box(x - .2, x + 1.2, 1.5, 2.0, z + .32, z + .9, K.STATION, 1, s);
+  for (let k = -1; k <= 2; k++) blockPath[z * W + x + k] = 1;
+  [x, z] = DATA.capsule; const c = stations.capsule = { type: "station", id: "capsule", x: x + .5, z: z + .5, found: false };
+  addObs({ s: 1, x: x + .5, z: z + .5, r: .45, y0: 0, y1: WH, kind: K.STATION, solid: 1, ref: c }); blockPath[z * W + x] = 1;
+  [x, z] = DATA.winch; const w = stations.winch = { type: "station", id: "winch", x: x + .5, z: z + .5, found: false };
+  box(x + .1, x + .9, 0, 1.15, z + .1, z + .9, K.STATION, 1, w); addObs({ s: 1, x: x + .5, z: z + .5, r: .12, y0: 1.15, y1: WH, kind: K.STATION, solid: 0, ref: w }); blockPath[z * W + x] = 1;
+})();
+// painted signs, readable only once scanned
+const SIGN = new Map(), MW = 512, MH = 180;
+(function () {
+  const cv = document.createElement("canvas"); cv.width = MW; cv.height = MH; const g = cv.getContext("2d");
+  for (const [ax, az, bx, bz, d0, text] of DATA.signs) {
+    const d = d0.replace("y", "z");
+    g.clearRect(0, 0, MW, MH); g.fillStyle = "#fff"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.font = `bold ${Math.min(128, Math.floor(460 / text.length))}px "Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif`;
+    g.fillText(text, MW / 2, MH / 2 + 4); g.fillRect(14, 8, MW - 28, 7); g.fillRect(14, MH - 15, MW - 28, 7);
+    const px = g.getImageData(0, 0, MW, MH).data, mask = new Uint8Array(MW * MH);
+    for (let i = 0; i < MW * MH; i++) mask[i] = px[i * 4 + 3] > 100 ? 1 : 0;
+    SIGN.set(ax + "," + az + "," + d, { mask, off: 0 }); SIGN.set(bx + "," + bz + "," + d, { mask, off: 1 });
+  }
+})();
+
+// ================================================================ three
+const mount = $("game");
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+renderer.setPixelRatio(DPR); renderer.setClearColor(0x010407, 1); mount.appendChild(renderer.domElement);
+const cv = renderer.domElement;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(78, 1, .05, 90); camera.rotation.order = "YXZ";
+const occMat = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
+function boxQuads(v, x0, x1, y0, y1, z0, z1) {
+  const q = (a, b, c, d) => v.push(...a, ...b, ...c, ...a, ...c, ...d);
+  q([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]); q([x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]);
+  q([x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [x1, y0, z0]); q([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]);
+  q([x0, y1, z0], [x0, y1, z1], [x1, y1, z1], [x1, y1, z0]); q([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]);
+}
+(function () {
+  const v = [], q = (a, b, c, d) => v.push(...a, ...b, ...c, ...a, ...c, ...d);
+  const open = i => { const t = tile[i]; return t === T_FLOOR || t === T_DOOR || t === T_GLASS; };
+  for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
+    const i = z * W + x; if (!isWallT(i)) continue;
+    if (x > 0 && open(i - 1)) q([x, 0, z], [x, 0, z + 1], [x, WH, z + 1], [x, WH, z]);
+    if (x < W - 1 && open(i + 1)) q([x + 1, 0, z], [x + 1, WH, z], [x + 1, WH, z + 1], [x + 1, 0, z + 1]);
+    if (z > 0 && open(i - W)) q([x, 0, z], [x, WH, z], [x + 1, WH, z], [x + 1, 0, z]);
+    if (z < H - 1 && open(i + W)) q([x, 0, z + 1], [x + 1, 0, z + 1], [x + 1, WH, z + 1], [x, WH, z + 1]);
+  }
+  for (const o of OBS) { if (o.s === 0) boxQuads(v, o.x0, o.x1, o.y0, o.y1, o.z0, o.z1); else if (o.s === 1) { const r = o.r * .72; boxQuads(v, o.x - r, o.x + r, o.y0, o.y1, o.z - r, o.z + r); } }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(v, 3));
+  const m = new THREE.Mesh(geo, occMat); m.renderOrder = 0; scene.add(m);
+  const dg = new THREE.BoxGeometry(1, WH, 1);
+  for (const d of doors) { d.mesh = new THREE.Mesh(dg, occMat); d.mesh.position.set(d.x + .5, WH / 2, d.z + .5); d.mesh.renderOrder = 0; scene.add(d.mesh); }
+})();
+const MAXP = 320000;
+const pPos = new Float32Array(MAXP * 3), pCol = new Float32Array(MAXP * 3), pBirth = new Float32Array(MAXP), pLife = new Float32Array(MAXP);
+const pGeo = new THREE.BufferGeometry();
+const aPos = new THREE.BufferAttribute(pPos, 3), aCol = new THREE.BufferAttribute(pCol, 3), aBirth = new THREE.BufferAttribute(pBirth, 1), aLife = new THREE.BufferAttribute(pLife, 1);
+for (const a of [aPos, aCol, aBirth, aLife]) a.setUsage(THREE.DynamicDrawUsage);
+pGeo.setAttribute("position", aPos); pGeo.setAttribute("aColor", aCol); pGeo.setAttribute("aBirth", aBirth); pGeo.setAttribute("aLife", aLife); pGeo.setDrawRange(0, 0);
+const pMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uGlitch: { value: 0 }, uPR: { value: DPR } },
+  vertexShader: `
+    attribute vec3 aColor; attribute float aBirth; attribute float aLife;
+    uniform float uTime, uGlitch, uPR; varying vec3 vColor; varying float vA;
+    void main(){
+      float age = uTime - aBirth;
+      float fade = age < 0.0 ? 0.0 : clamp(1.0 - age / max(aLife, 0.001), 0.0, 1.0);
+      fade = fade * fade * (3.0 - 2.0 * fade);
+      float flash = age < 0.0 ? 0.0 : exp(-age * 5.0);
+      vec3 p = position;
+      float n = fract(sin(dot(p.xz + p.y, vec2(12.9898, 78.233)) + floor(uTime * 24.0) * 1.37) * 43758.5453);
+      if (uGlitch > 0.001) { float j = step(1.0 - uGlitch * 0.6, n); p += (vec3(n, fract(n * 7.13), fract(n * 3.71)) - 0.5) * j * uGlitch * 0.7; if (n < uGlitch * 0.22) fade = 0.0; }
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      gl_Position = projectionMatrix * mv;
+      float sz = clamp(7.0 / -mv.z, 1.8, 5.5);
+      gl_PointSize = sz * (1.0 + flash * 1.3) * uPR;
+      vColor = aColor * (0.3 + 0.7 * fade) + vec3(0.3) * flash; vA = fade;
+    }`,
+  fragmentShader: `
+    varying vec3 vColor; varying float vA;
+    void main(){ vec2 c = gl_PointCoord - 0.5; float d = dot(c, c); if (d > 0.25 || vA < 0.01) discard; gl_FragColor = vec4(min(vColor * (1.2 - d * 2.6) * vA * 1.35, vec3(1.0)), 1.0); }`,
+  transparent: true, depthWrite: false, depthTest: true, blending: THREE.CustomBlending, blendEquation: THREE.MaxEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor
+});
+const cloud = new THREE.Points(pGeo, pMat); cloud.frustumCulled = false; cloud.renderOrder = 1; scene.add(cloud);
+let pHead = 0, pCount = 0, dMin = 1e9, dMax = -1, wrapped = false, allDirty = false, now = 0;
+function addPoint(x, y, z, r, g, b, life, birth) {
+  const i = pHead, i3 = i * 3; pPos[i3] = x; pPos[i3 + 1] = y; pPos[i3 + 2] = z; pCol[i3] = r; pCol[i3 + 1] = g; pCol[i3 + 2] = b; pBirth[i] = birth; pLife[i] = life;
+  if (i < dMin) dMin = i; if (i > dMax) dMax = i; if (++pHead >= MAXP) { pHead = 0; wrapped = true; } if (pCount < MAXP) pCount++;
+}
+function flushPoints() {
+  if (dMax < 0 && !allDirty) return;
+  let off = dMin, cnt = dMax - dMin + 1; if (wrapped || allDirty) { off = 0; cnt = MAXP; }
+  for (const [a, sz] of [[aPos, 3], [aCol, 3], [aBirth, 1], [aLife, 1]]) { a.updateRange.offset = off * sz; a.updateRange.count = cnt * sz; a.needsUpdate = true; }
+  pGeo.setDrawRange(0, pCount); dMin = 1e9; dMax = -1; wrapped = false; allDirty = false;
+}
+function clearPoints() { pHead = 0; pCount = 0; pLife.fill(0); allDirty = true; }
+function erasePoints(x0, x1, z0, z1) { let ch = false; for (let i = 0, o = 0; i < pCount; i++, o += 3) { if (pLife[i] <= 0) continue; const x = pPos[o], z = pPos[o + 2]; if (x > x0 && x < x1 && z > z0 && z < z1) { pLife[i] = 0; ch = true; } } if (ch) allDirty = true; }
+const LMAX = 140, lPos = new Float32Array(LMAX * 6), lCol = new Float32Array(LMAX * 6), lGeo = new THREE.BufferGeometry();
+const laPos = new THREE.BufferAttribute(lPos, 3), laCol = new THREE.BufferAttribute(lCol, 3); laPos.setUsage(THREE.DynamicDrawUsage); laCol.setUsage(THREE.DynamicDrawUsage);
+lGeo.setAttribute("position", laPos); lGeo.setAttribute("color", laCol);
+const lasers = new THREE.LineSegments(lGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false }));
+lasers.frustumCulled = false; lasers.renderOrder = 2; scene.add(lasers);
+let lCount = 0; const EM = new THREE.Vector3();
+function addLaser(x, y, z, r, g, b) { if (lCount >= LMAX) return; const o = lCount * 6; lPos[o] = EM.x; lPos[o + 1] = EM.y; lPos[o + 2] = EM.z; lPos[o + 3] = x; lPos[o + 4] = y; lPos[o + 5] = z; lCol[o] = r * .12; lCol[o + 1] = g * .12; lCol[o + 2] = b * .12; lCol[o + 3] = r; lCol[o + 4] = g; lCol[o + 5] = b; lCount++; }
+
+// ================================================================ run state
+let state = "title", runTime = 0, muted = false;
+const P = { x: 0, z: 0, yaw: 0, pitch: 0, o2: 100, bat: 100, breach: false, beacons: 0, kits: 0, scanOn: true, sneak: false, hidden: null, cone: .24, idle: 0, step: 0, moving: false, sprint: false, noiseT: -9, inv: 0, kx: 0, kz: 0, bob: 0, parts: {}, installed: {}, notes: new Set() };
+let items = [], debris = [], beacons = [], drift = null, dyn = [], dbox = [];
+const MON = { type: "A", x: 0, z: 0, yaw: 0, st: "patrol", path: [], tx: 0, tz: 0, timer: 0, stun: 0, lost: 0, rep: 0, phase: 0, speed: 0, moving: false, cd: 0, lit: 0, door: 0, vent: false, seenT: -99, seenHide: false, expo: 0, dis: null, shape: 0, breath: 0, tick: 0, stepA: 0, call: 8, heardT: -9, wake: 0, met: false };
+const DIR = { menace: 0, quiet: 0, relief: 0 };
+const SC = { corpseLocker: null, doorCorpse: null, shiftT: 300, shiftDone: false, lastT: -99, stingT: -99 };
+let sweepA = 0, focusing = false, pulseT = -9, holdProg = 0, holdId = null, curRoom = "", glitch = 0, hurt = 0, shake = 0, dyingT = 0, deathWhy = "", black = 0, exert = 0, breathT = 0, beatT = 0, wonRoute = null;
+const keys = Object.create(null);
+let lockFailed = false, wasLocked = false, everLocked = false;
+function career() { try { return JSON.parse(localStorage.getItem("depth3800.career")) || { dives: 0, escapes: 0, best: 0, met: "" }; } catch (e) { return { dives: 0, escapes: 0, best: 0, met: "" }; } }
+function saveCareer(c) { try { localStorage.setItem("depth3800.career", JSON.stringify(c)); } catch (e) { } }
+
+function solidAt(x, z) { if (x < 0 || z < 0 || x >= W || z >= H) return true; const t = tile[z * W + x]; if (t === T_FLOOR) return false; if (t === T_DOOR) { const d = doorAt[z * W + x]; return d.jam || d.open < .5; } return true; }
+function walkable(i) { const t = tile[i]; if (t === T_FLOOR) return !blockPath[i]; if (t === T_DOOR) return !doorAt[i].jam; return false; }
+const bPrev = new Int32Array(W * H), bQ = new Int32Array(W * H), bDist = new Int32Array(W * H);
+function flood(sx, sz) {
+  bDist.fill(-1); const s = Math.floor(sz) * W + Math.floor(sx); bDist[s] = 0; bPrev.fill(-1); bPrev[s] = s; let h = 0, n = 0; bQ[n++] = s;
+  while (h < n) { const c = bQ[h++]; for (const d of [1, -1, W, -W]) { const ni = c + d; if (ni < 0 || ni >= W * H || bDist[ni] >= 0 || !walkable(ni)) continue; bDist[ni] = bDist[c] + 1; bPrev[ni] = c; bQ[n++] = ni; } }
+  return n;
+}
+function findPath(sx, sz, tx, tz) {
+  const s = Math.floor(sz) * W + Math.floor(sx), g = Math.floor(tz) * W + Math.floor(tx); if (s === g) return [];
+  bPrev.fill(-1); bPrev[s] = s; let h = 0, n = 0; bQ[n++] = s; let found = false;
+  while (h < n) { const c = bQ[h++]; if (c === g) { found = true; break; } for (const d of [1, -1, W, -W]) { const ni = c + d; if (ni < 0 || ni >= W * H || bPrev[ni] >= 0) continue; if (!walkable(ni) && ni !== g) continue; bPrev[ni] = c; bQ[n++] = ni; } }
+  if (!found) return []; const out = []; let c = g; while (c !== s) { out.push(c); c = bPrev[c]; } return out.reverse();
+}
+function randomCell(x, z, rmin, rmax) { for (let i = 0; i < 80; i++) { const a = rnd() * TAU, r = rmin + rnd() * (rmax - rmin), cx = Math.floor(x + Math.cos(a) * r), cz = Math.floor(z + Math.sin(a) * r); if (cx > 0 && cz > 0 && cx < W && cz < H && walkable(cz * W + cx) && tile[cz * W + cx] === T_FLOOR) return [cx, cz]; } return null; }
+function losWalk(ax, az, bx, bz) { const d = hyp(bx - ax, bz - az), n = Math.ceil(d / .25); for (let i = 1; i < n; i++) { const x = Math.floor(ax + (bx - ax) * i / n), z = Math.floor(az + (bz - az) * i / n); if (solidAt(x, z) || blockPath[z * W + x]) return false; } return true; }
+
+function newRun() {
+  initAudio();
+  // reset doors, pick jammed ones that keep everything reachable
+  for (const d of doors) { d.open = 0; d.target = 0; d.jam = false; d.broken = false; d.corpse = false; }
+  const [sx, sz] = DATA.start; const need = [DATA.sub, DATA.capsule, DATA.winch].map(([x, z]) => [x, z - (z === DATA.sub[1] && x === DATA.sub[0] ? 1 : 0)]);
+  for (let tries = 0; tries < 30; tries++) {
+    for (const d of doors) d.jam = false;
+    for (const [x, z] of shuffle(DATA.jam.slice()).slice(0, 3)) doorAt[z * W + x].jam = true;
+    flood(sx + .5, sz + .5);
+    let ok = true; for (const [x, z] of DATA.spots) if (bDist[z * W + x] < 0) ok = false;
+    for (const [x, z] of [[DATA.capsule[0] + 1, DATA.capsule[1]], [DATA.winch[0], DATA.winch[1] + 1], [DATA.sub[0], DATA.sub[1] - 1]]) if (bDist[z * W + x] < 0) ok = false;
+    if (ok) break; if (tries === 29) for (const d of doors) d.jam = false;
+  }
+  for (const d of doors) d.mesh.visible = true;
+  for (const L of lockers) L.found = false; for (const k in stations) stations[k].found = false;
+  known.fill(0);
+  // items
+  const spots = shuffle(DATA.spots.slice()); items = [];
+  const put = (kind, id) => { const [x, z] = spots.pop(); items.push({ type: "item", kind, id, x: x + .5 + (rnd() - .5) * .3, z: z + .5 + (rnd() - .5) * .3, taken: false, found: false }); };
+  for (const id in PARTS) put("part", id);
+  for (let i = 0; i < 7; i++) put("o2"); for (let i = 0; i < 4; i++) put("beacon"); for (let i = 0; i < 3; i++) put("kit"); for (let i = 1; i <= NNOTES; i++) put("note", i);
+  debris = DATA.debris.map(([x, z]) => { const a = rnd() * TAU, s = .1 + rnd() * .16; return { x: x + .5, z: z + .5, y: .5 + rnd() * 1.7, vx: Math.cos(a) * s, vz: Math.sin(a) * s, r: .1 + rnd() * .1 }; });
+  beacons = []; drift = null;
+  Object.assign(P, { x: sx + .5, z: sz + .5, yaw: Math.PI, pitch: 0, o2: 100, bat: 100, breach: false, beacons: 1, kits: 0, scanOn: true, sneak: false, hidden: null, idle: 0, step: 0, inv: 0, kx: 0, kz: 0, parts: {}, installed: {}, notes: new Set(), noiseT: -9 });
+  // monster
+  const c = career(); const pool = ["A", "B", "C"].filter(t => !c.met.includes(t)); MON.type = pool.length ? pick(pool) : pick(["A", "B", "C"]);
+  flood(P.x, P.z); let far = null, fd = 0; for (let i = 0; i < W * H; i++) if (bDist[i] > fd && tile[i] === T_FLOOR) { fd = bDist[i]; far = i; }
+  Object.assign(MON, { x: far % W + .5, z: ((far / W) | 0) + .5, yaw: 0, st: MON.type === "C" ? "gone" : "patrol", path: [], timer: MON.type === "C" ? 20 : 0, stun: 0, lost: 0, rep: 0, phase: 0, speed: 0, moving: false, cd: 0, lit: 0, door: 0, vent: false, seenT: -99, seenHide: false, expo: 0, dis: null, call: 10, wake: 45, met: false, heardT: -9 });
+  Object.assign(DIR, { menace: 0, quiet: 0, relief: 0 });
+  Object.assign(SC, { corpseLocker: pick(lockers.filter(L => hyp(L.x - P.x, L.z - P.z) > 12)), doorCorpse: pick(doors.filter(d => !d.jam && hyp(d.x - P.x, d.z - P.z) > 14)), shiftT: 240 + rnd() * 200, shiftDone: false, lastT: -99, stingT: -99 });
+  clearPoints(); runTime = 0; holdProg = 0; holdId = null; glitch = 0; hurt = 0; shake = 0; black = 0; exert = 0; curRoom = ""; focusing = false; wonRoute = null; $("toasts").innerHTML = "";
+  c.dives++; saveCareer(c);
+  state = "play"; show(null); $("slit").hidden = true; updateCamera(); buildDyn();
+  for (let i = 0; i < 3200; i++) { const u = rnd() * 2 - 1, a = rnd() * TAU, s = Math.sqrt(1 - u * u); castRay(P.x, EYE, P.z, Math.cos(a) * s, u, Math.sin(a) * s, 16, 2, 12); }
+  updateHUD(); setPlace("문풀"); requestLock();
+  toast("수면 지원선 ▸ 케이블 장력이 0이다. 끊어졌다.", "r", 6);
+  setTimeout(() => state === "play" && toast("수면 지원선 ▸ 배 안에 다른 탈출 수단이 있을 것이다. 찾아서 올라와라.", "r", 7), 3200);
+  setTimeout(() => state === "play" && toast("바로 앞에 구조 잠수정이 있다. 무엇이 빠졌는지 확인하라.", "s", 6), 7500);
+}
+
+// ================================================================ raycast
+const R = { t: 0, kind: 0, ref: null, side: 0, ix: 0, iz: 0, sx: 0, sz: 0, gt: -1 };
+let MARK = true, RT = 0;
+function castSeg(ox, oy, oz, dx, dy, dz, maxD) {
+  let best = maxD, kind = 0, ref = null;
+  if (dy < -1e-6) { const t = -oy / dy; if (t < best) { best = t; kind = K.FLOOR; } } else if (dy > 1e-6) { const t = (WH - oy) / dy; if (t < best) { best = t; kind = K.CEIL; } }
+  for (let i = 0; i < dyn.length; i++) { const c = dyn[i], lx = ox - c.x, ly = oy - c.y, lz = oz - c.z, cc = lx * lx + ly * ly + lz * lz - c.r * c.r; if (cc < 0) continue; const b = lx * dx + ly * dy + lz * dz, h = b * b - cc; if (h < 0) continue; const t = -b - Math.sqrt(h); if (t > 0 && t < best) { best = t; kind = c.kind; ref = c.ref; } }
+  for (let i = 0; i < dbox.length; i++) { const t = rayBox(ox, oy, oz, dx, dy, dz, dbox[i]); if (t < best) { best = t; kind = dbox[i].kind; ref = dbox[i].ref; } }
+  let ix = Math.floor(ox), iz = Math.floor(oz);
+  const sx = dx > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1, adx = Math.abs(dx), adz = Math.abs(dz);
+  const tdx = adx > 1e-9 ? 1 / adx : 1e30, tdz = adz > 1e-9 ? 1 / adz : 1e30;
+  let tmx = adx > 1e-9 ? ((dx > 0 ? ix + 1 : ix) - ox) / dx : 1e30, tmz = adz > 1e-9 ? ((dz > 0 ? iz + 1 : iz) - oz) / dz : 1e30;
+  R.gt = -1; R.side = -1; R.sx = sx; R.sz = sz;
+  for (let n = 0; n < 80; n++) {
+    const ci = iz * W + ix; if (MARK && !known[ci]) known[ci] = 1;
+    const L = obsCell[ci];
+    if (L) for (let k = 0; k < L.length; k++) {
+      const o = L[k]; let t = 1e30;
+      if (o.s === 0) t = rayBox(ox, oy, oz, dx, dy, dz, o);
+      else if (o.s === 1) { const a = dx * dx + dz * dz; if (a > 1e-9) { const lx = ox - o.x, lz = oz - o.z, cc = lx * lx + lz * lz - o.r * o.r; if (cc > 0) { const b = lx * dx + lz * dz, h = b * b - a * cc; if (h >= 0) { const q = (-b - Math.sqrt(h)) / a; if (q > 0) { const y = oy + dy * q; if (y >= o.y0 && y <= o.y1) t = q; } } } } }
+      else { const lx = ox - o.x, ly = oy - o.y, lz = oz - o.z, cc = lx * lx + ly * ly + lz * lz - o.r * o.r; if (cc > 0) { const b = lx * dx + ly * dy + lz * dz, h = b * b - cc; if (h >= 0) { const q = -b - Math.sqrt(h); if (q > 0) t = q; } } }
+      if (t < best) { best = t; kind = o.kind; ref = o.ref || null; R.side = -1; }
+    }
+    let tn, side; if (tmx < tmz) { tn = tmx; side = 0; } else { tn = tmz; side = 1; }
+    if (tn >= best) break;
+    if (side === 0) { ix += sx; tmx += tdx; } else { iz += sz; tmz += tdz; }
+    if (ix < 0 || iz < 0 || ix >= W || iz >= H) { best = tn; kind = 0; break; }
+    const ti = iz * W + ix, tt = tile[ti];
+    if (tt === T_FLOOR) continue;
+    if (tt === T_WALL || tt === T_SPACE) { best = tn; kind = K.WALL; ref = null; R.side = side; R.ix = ix; R.iz = iz; if (MARK) known[ti] = 2; break; }
+    if (tt === T_DOOR) { const d = doorAt[ti]; if (d.jam || d.open < .5) { best = tn; kind = d.jam ? K.JAM : K.DOOR; ref = null; R.side = side; R.ix = ix; R.iz = iz; if (MARK) known[ti] = d.jam ? 5 : 3; break; } if (MARK) known[ti] = 3; continue; }
+    if (tt === T_GLASS) { if (MARK) known[ti] = 4; if (R.gt < 0 && rnd() < .2) R.gt = tn + .02; }
+  }
+  R.t = best; R.kind = kind; R.ref = ref; return kind;
+}
+function rayBox(ox, oy, oz, dx, dy, dz, b) {
+  let t0 = 0, t1 = 1e30, a, c;
+  if (Math.abs(dx) < 1e-9) { if (ox < b.x0 || ox > b.x1) return 1e30; } else { a = (b.x0 - ox) / dx; c = (b.x1 - ox) / dx; if (a > c) { const q = a; a = c; c = q; } if (a > t0) t0 = a; if (c < t1) t1 = c; if (t0 > t1) return 1e30; }
+  if (Math.abs(dy) < 1e-9) { if (oy < b.y0 || oy > b.y1) return 1e30; } else { a = (b.y0 - oy) / dy; c = (b.y1 - oy) / dy; if (a > c) { const q = a; a = c; c = q; } if (a > t0) t0 = a; if (c < t1) t1 = c; if (t0 > t1) return 1e30; }
+  if (Math.abs(dz) < 1e-9) { if (oz < b.z0 || oz > b.z1) return 1e30; } else { a = (b.z0 - oz) / dz; c = (b.z1 - oz) / dz; if (a > c) { const q = a; a = c; c = q; } if (a > t0) t0 = a; if (c < t1) t1 = c; if (t0 > t1) return 1e30; }
+  return t0 > 1e-4 ? t0 : 1e30;
+}
+const COL = [0, 0, 0];
+function shade(kind, x, y, z, t, ref) {
+  const k = Math.min(t / 20, 1);
+  let r = .42 + (.1 - .42) * k, g = 1 + (.42 - 1) * k, b = .9 + (.7 - .9) * k, I = 1, life = 70;
+  if (kind === K.WALL) {
+    if (R.side >= 0) {
+      const u = R.side === 0 ? z : x; if (frac(u) < .04 || Math.abs(y - 1.05) < .03 || y < .1 || y > WH - .12) I = .42;
+      const dir = R.side === 0 ? (R.sx > 0 ? "+x" : "-x") : (R.sz > 0 ? "+z" : "-z"), sg = SIGN.get(R.ix + "," + R.iz + "," + dir);
+      if (sg && y > 1.3 && y < 2.0) { let uu; if (dir === "+x") uu = z - R.iz; else if (dir === "-x") uu = R.iz + 1 - z; else if (dir === "+z") uu = R.ix + 1 - x; else uu = x - R.ix; const px = Math.floor((sg.off + uu) / 2 * MW), py = Math.floor((2.0 - y) / .7 * MH); if (px >= 0 && px < MW && py >= 0 && py < MH && sg.mask[py * MW + px]) { r = 1; g = .97; b = .88; I = 1.25; } }
+    } else I = .8;
+  } else if (kind === K.FLOOR) I = (frac(x * 2) < .09 || frac(z * 2) < .09) ? .25 : .62;
+  else if (kind === K.CEIL) I = (frac(x * .5) < .07 || frac(z * .5) < .07) ? .6 : .34;
+  else if (kind === K.GLASS) { r = .2; g = .4; b = .75; I = .6; life = 25; }
+  else if (kind === K.DOOR) { r = .45; g = 1; b = .55; I = (Math.abs(y - 1.3) < .04 || frac(R.side === 0 ? z : x) < .06) ? .4 : .9; }
+  else if (kind === K.JAM) { r = 1; g = .55; b = .2; I = frac((x + z + y) * 2.5) < .5 ? .9 : .3; }
+  else if (kind === K.CRATE) { r = .95; g = .62; b = .25; I = .85 * (1 - k * .6); }
+  else if (kind === K.FURN) { r = .5; g = .62; b = .85; I = .9 * (1 - k * .5); }
+  else if (kind === K.TANK) { r = .25; g = .8; b = .7; I = (frac(y * 1.5) < .08 ? .4 : .85) * (1 - k * .5); }
+  else if (kind === K.LOCKER) { r = .62; g = .78; b = .86; I = (y > 1.5 && y < 1.75 && frac(y * 16) < .5 ? .35 : .9) * (1 - k * .5); }
+  else if (kind === K.PIPE) { r = .2; g = .6; b = .6; I = .7; }
+  else if (kind === K.BODY) { r = .95; g = .9; b = .84; I = 1; }
+  else if (kind === K.ITEM) { r = 1; g = .95; b = .35; I = 1.3; life = 90; }
+  else if (kind === K.STATION) { r = 1; g = .8; b = .3; I = 1; life = 90; }
+  else if (kind === K.VENT) { r = .7; g = .5; b = 1; I = frac(x * 8) < .5 ? .9 : .3; }
+  else if (kind === K.MON) { if (ref && ref.moving) { r = 1; g = .08; b = .14; I = 1.25; life = 2.6; } else { r = .92; g = .9; b = .88; I = 1; life = 7; } }
+  else if (kind === K.DEBRIS) { r = 1; g = .22; b = .2; I = .8; life = 3.5; }
+  else if (kind === K.BEACON) { r = 1; g = .9; b = .4; I = 1.2; life = 1.2; }
+  COL[0] = r * I; COL[1] = g * I; COL[2] = b * I; return life;
+}
+// modes: 0 passive ring, 1 focus, 2 pulse, 3 beacon
+function castRay(ox, oy, oz, dx, dy, dz, maxD, mode, spd, laser) {
+  MARK = mode !== 3 || true;
+  let kind = castSeg(ox, oy, oz, dx, dy, dz, maxD); const t = R.t; RT = t;
+  if (R.gt > 0) { shade(K.GLASS, 0, 0, 0, R.gt); addPoint(ox + dx * R.gt, oy + dy * R.gt, oz + dz * R.gt, COL[0], COL[1], COL[2], 25, spd ? now + R.gt / spd : now); }
+  if (rnd() < .035) { const q = .5 + rnd() * Math.min(t - .5, 3.5); if (q > .5) addPoint(ox + dx * q + (rnd() - .5) * .3, oy + dy * q + (rnd() - .5) * .3, oz + dz * q + (rnd() - .5) * .3, .2, .34, .36, 1.1, spd ? now + q / spd : now); }
+  if (!kind) return 0;
+  const ref = R.ref;
+  if (kind === K.MON) {
+    if (MON.st !== "dis") { if (now - MON.seenT > 25 && now - SC.stingT > 20 && mode !== 3) { SC.stingT = now; sfx.sting(.5); } MON.seenT = now; if (!MON.met) meet(); }
+    if (mode === 1) MON.fHit = true; if (mode === 1 || mode === 2) MON.lit = .7;
+  } else if (ref && (kind === K.LOCKER || kind === K.CRATE) && ref === MON) { if (mode === 1) MON.fHit = true; }
+  else if (ref && ref.found === false) ref.found = true;
+  const tt = t - .03, j = .014, jr = ref === MON && MON.st === "dis" && MON.expo > .15 ? MON.expo * .12 : 0;
+  const x = ox + dx * tt + (rnd() - .5) * (j + jr), y = oy + dy * tt + (rnd() - .5) * (j + jr), z = oz + dz * tt + (rnd() - .5) * (j + jr);
+  const life = shade(kind, x, y, z, t, ref);
+  addPoint(x, y, z, COL[0], COL[1], COL[2], life, spd ? now + t / spd : now);
+  if (laser) addLaser(x, y, z, COL[0], COL[1], COL[2]);
+  return kind;
+}
+
+// ================================================================ audio
+const AU = { ctx: null };
+function initAudio() {
+  if (AU.ctx) { if (!muted && AU.ctx.resume) AU.ctx.resume(); return; }
+  try { AU.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  const c = AU.ctx, sr = c.sampleRate;
+  AU.out = c.createBiquadFilter(); AU.out.type = "lowpass"; AU.out.frequency.value = 3400; AU.out.connect(c.destination);
+  AU.master = c.createGain(); AU.master.gain.value = .85; AU.master.connect(AU.out);
+  const nb = c.createBuffer(1, sr * 2, sr), d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = rnd() * 2 - 1; AU.noise = nb;
+  const loop = () => { const s = c.createBufferSource(); s.buffer = nb; s.loop = true; s.start(); return s; };
+  const filt = (t, f, q) => { const b = c.createBiquadFilter(); b.type = t; b.frequency.value = f; if (q) b.Q.value = q; return b; };
+  const gain = v => { const g = c.createGain(); g.gain.value = v; return g; };
+  const dl = filt("lowpass", 140), dg = gain(.1); dl.connect(dg); dg.connect(AU.master);
+  for (const [t, f] of [["sine", 38], ["sine", 38.7], ["triangle", 57.5]]) { const o = c.createOscillator(); o.type = t; o.frequency.value = f; o.connect(dl); o.start(); }
+  const sea = loop(), sl = filt("lowpass", 90), sg = gain(.16); sea.connect(sl); sl.connect(sg); sg.connect(AU.master);
+  const sc = loop(), sh = filt("highpass", 5200); AU.scanG = gain(0); sc.connect(sh); sh.connect(AU.scanG); AU.scanG.connect(c.destination);
+  const st = loop(), sb = filt("bandpass", 2400, .7); AU.staticG = gain(0); st.connect(sb); sb.connect(AU.staticG); AU.staticG.connect(c.destination);
+  AU.opG = gain(0); const op = c.createOscillator(); op.type = "sawtooth"; op.frequency.value = 55; const ol = filt("lowpass", 400); op.connect(ol); ol.connect(AU.opG); AU.opG.connect(AU.master); op.start(); AU.op = op;
+}
+function panNode(p) { const c = AU.ctx; if (c.createStereoPanner) { const n = c.createStereoPanner(); n.pan.value = clamp(p, -1, 1); n.connect(AU.master); return n; } return AU.master; }
+function tone(f, dur, vol, pan = 0, type = "sine", f2) {
+  const c = AU.ctx; if (!c || vol <= 0.0005) return; const t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + Math.min(.02, dur * .2)); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(panNode(pan)); o.start(t); o.stop(t + dur + .05);
+}
+function nburst(dur, vol, f, pan = 0, type = "lowpass", f2, atk) {
+  const c = AU.ctx; if (!c || vol <= 0.0005) return; const t = c.currentTime, s = c.createBufferSource(), b = c.createBiquadFilter(), g = c.createGain();
+  s.buffer = AU.noise; b.type = type; b.frequency.setValueAtTime(f, t); if (f2) b.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  if (atk) { g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(vol, t + atk); } else g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur); s.connect(b); b.connect(g); g.connect(panNode(pan)); s.start(t, rnd()); s.stop(t + dur + .05);
+}
+function setG(n, v, tc = .08) { if (n && AU.ctx) n.gain.setTargetAtTime(v, AU.ctx.currentTime, tc); }
+function rel(x, z) { const vx = x - P.x, vz = z - P.z, d = hyp(vx, vz) || 1; return { d, pan: (vx * Math.cos(P.yaw) - vz * Math.sin(P.yaw)) / d }; }
+const volAt = (d, range) => Math.pow(clamp(1 - d / range, 0, 1), 1.5);
+const sfx = {
+  sting(v = 1) { for (const f of [311, 329, 466, 622]) tone(f, 1.1, .11 * v, 0, "sawtooth", f * .97); nburst(.5, .5 * v, 3000, 0, "lowpass", 300); tone(55, 1.2, .5 * v, 0, "sine", 30); },
+  pulse() { tone(990, .8, .1, 0, "sine", 240); nburst(.5, .08, 1800, 0, "bandpass", 5000); },
+  door(x, z, smash) { const q = rel(x, z), v = volAt(q.d, smash ? 40 : 16); if (smash) { nburst(.6, .7 * v, 900, q.pan, "lowpass", 120); tone(70, .6, .5 * v, q.pan, "sawtooth", 34); } else { nburst(.5, .22 * v, 420, q.pan, "bandpass", 1300, .1); tone(110, .35, .08 * v, q.pan, "square", 70); } },
+  pick() { [660, 990].forEach((f, i) => setTimeout(() => tone(f, .22, .08, 0, "triangle"), i * 80)); },
+  deny() { tone(150, .16, .09, 0, "square"); },
+  install() { nburst(.12, .25, 2000, 0, "bandpass"); tone(220, .25, .12, 0, "square", 330); },
+  step(v) { nburst(.09, .1 * v, 260, 0, "lowpass"); tone(70, .12, .12 * v, 0, "sine", 45); },
+  hit() { nburst(.5, .7, 2500, 0, "lowpass", 180); tone(80, .5, .5, 0, "sawtooth", 36); },
+  hiss() { nburst(1.6, .22, 6000, 0, "highpass", 3000, .05); },
+  groan() { tone(52, 3.2, .4, (rnd() - .5), "sawtooth", 31); tone(77, 2.6, .2, (rnd() - .5), "sawtooth", 49); nburst(2.8, .3, 160, 0, "lowpass", 60, .4); },
+  bellow(x, z) { const q = rel(x, z), v = volAt(q.d, 60) * .6 + .03; tone(74, 2.4, v * .5, q.pan, "sawtooth", 46); tone(111, 2.2, v * .3, q.pan, "sine", 70); nburst(2, v * .25, 200, q.pan, "lowpass", 90, .3); },
+  roar(x, z) { const q = rel(x, z), v = volAt(q.d, 45) * .8 + .1; tone(160, 1.3, v * .5, q.pan, "sawtooth", 55); tone(171, 1.3, v * .45, q.pan, "sawtooth", 49); nburst(1.2, v * .5, 600, q.pan, "bandpass", 1800); },
+  thud(x, z, v) { const q = rel(x, z), a = volAt(q.d, 26) * v; tone(62, .28, a * .8, q.pan, "sine", 28); nburst(.14, a * .35, 240, q.pan); },
+  tick(x, z) { const q = rel(x, z); nburst(.02, volAt(q.d, 16) * .3, 5200, q.pan, "highpass"); },
+  clang(x, z) { const q = rel(x, z), v = volAt(q.d, 30); for (const f of [523, 811, 1290]) tone(f, .7, .1 * v, q.pan, "triangle", f * .98); nburst(.2, .3 * v, 3000, q.pan, "bandpass"); },
+  shriek(x, z) { const q = rel(x, z), v = volAt(q.d, 30) * .7 + .2; tone(520, .9, v * .4, q.pan, "sawtooth", 1500); tone(555, .9, v * .3, q.pan, "sawtooth", 1300); nburst(.9, v * .4, 1500, q.pan, "bandpass", 4200); },
+  wet(x, z) { const q = rel(x, z); nburst(.9, volAt(q.d, 5.5) * .14, 240, q.pan, "lowpass", 120, .3); },
+  beacon(x, z) { const q = rel(x, z); tone(1400, .15, .1 * volAt(q.d, 26) + .005, q.pan, "square"); },
+  breath(inh, v) { if (inh) nburst(1.0, .05 * v, 700, 0, "bandpass", 1500, .35); else { nburst(1.2, .06 * v, 900, 0, "bandpass", 380, .2); for (let i = 0; i < 3; i++) setTimeout(() => tone(300 + rnd() * 500, .07, .012 * v, rnd() - .5, "sine", 900 + rnd() * 600), 200 + i * 130 + rnd() * 80); } },
+  beat() { tone(58, .14, .22, 0, "sine", 36); setTimeout(() => tone(52, .16, .16, 0, "sine", 32), 150); },
+  win() { [392, 523, 659, 784].forEach((f, i) => setTimeout(() => tone(f, 1.6, .08, 0, "triangle"), i * 180)); }
+};
+
+// ================================================================ HUD
+const hud = $("hud"), screens = { title: $("title"), noteview: $("noteview"), pause: $("pause"), dead: $("dead"), won: $("won"), mapscr: $("mapscr") };
+function show(name) { for (const k in screens) screens[k].hidden = k !== name; hud.hidden = name !== null; }
+function toast(text, cls = "r", dur = 5) { const d = document.createElement("div"); d.textContent = text; d.className = cls; const b = $("toasts"); b.appendChild(d); while (b.children.length > 4) b.firstChild.remove(); setTimeout(() => { d.style.opacity = "0"; }, dur * 1000); setTimeout(() => d.remove(), dur * 1000 + 1000); }
+function setPlace(n) { curRoom = n; const el = $("place"); el.textContent = n; el.classList.remove("on"); void el.offsetWidth; el.classList.add("on"); $("loc").textContent = n; }
+function roomAt(x, z) { for (const r of ROOMS) if (x > r[1] && x < r[3] + 1 && z > r[2] && z < r[4] + 1) return r[0]; return ""; }
+function routeReady(r) { return r.needs.every(n => P.installed[n]); }
+function updateHUD() {
+  $("o2Fill").style.width = P.o2 + "%"; $("o2Txt").textContent = Math.ceil(P.o2); $("o2Bar").classList.toggle("low", P.o2 < 25);
+  $("batFill").style.width = P.bat + "%"; $("batTxt").textContent = Math.round(P.bat); $("batBar").classList.toggle("low", P.bat < 20);
+  const s = $("suit"); s.textContent = P.breach ? "잠수복 파열 · 산소 누출" : "잠수복 정상"; s.classList.toggle("bad", P.breach);
+  $("bcn").textContent = P.beacons; $("kit").textContent = P.kits; $("notecount").textContent = `기록 ${P.notes.size} / ${NNOTES}`;
+  $("mode").textContent = P.hidden ? "숨는 중" : P.sneak ? "살금살금" : "";
+  $("routes").innerHTML = ROUTES.map(r => `<div class="${routeReady(r) ? "ready" : ""}"><b>${r.name}</b> · ` + r.needs.map(n => `<span class="${P.installed[n] ? "in" : P.parts[n] ? "have" : ""}">${PARTS[n]}${P.installed[n] ? " ✓" : P.parts[n] ? " (소지)" : ""}</span>`).join(", ") + "</div>").join("");
+  const vh = Math.tan(camera.fov * Math.PI / 360), px = Math.tan(P.cone) / vh * innerHeight, ret = $("reticle"); ret.style.width = ret.style.height = Math.max(8, px) + "px";
+}
+let prevState = "play";
+function openNote(id) { const n = NOTES[id]; P.notes.add(id); $("noteWho").textContent = n.who; $("noteTitle").textContent = n.title; $("noteBody").textContent = n.body; prevState = state === "paused" ? "paused" : "play"; state = "note"; show("noteview"); unlock(); quiet(); $("btnNoteClose").focus(); }
+function closeNote() { if (state !== "note") return; if (prevState === "paused") { state = "paused"; show("pause"); } else resume(); }
+function openPause() {
+  state = "paused"; show("pause"); quiet(); const a = $("archive"); a.innerHTML = ""; const ids = [...P.notes].sort((x, y) => x - y);
+  if (!ids.length) a.innerHTML = '<div class="none">아직 주운 기록이 없다.</div>';
+  for (const id of ids) { const b = document.createElement("button"); b.type = "button"; b.innerHTML = `<span>${String(id).padStart(2, "0")}</span>`; b.append(NOTES[id].title + " · " + NOTES[id].who.split(" · ")[0]); b.addEventListener("click", () => openNote(id)); a.appendChild(b); }
+}
+function resume() { state = "play"; show(null); for (const k in keys) keys[k] = false; focusing = false; updateHUD(); requestLock(); }
+function quiet() { setG(AU.scanG, 0); setG(AU.opG, 0); }
+function requestLock() { try { const p = cv.requestPointerLock && cv.requestPointerLock(); if (p && p.catch) p.catch(() => { if (!everLocked) lockFailed = true; }); } catch (e) { if (!everLocked) lockFailed = true; } }
+function unlock() { wasLocked = false; if (document.pointerLockElement) document.exitPointerLock(); }
+
+// ================================================================ world interaction
+function noise(x, z, rad) {
+  if (MON.type !== "A" || MON.wake > 0 || MON.stun > 0 || MON.st === "retreat") return; const d = hyp(MON.x - x, MON.z - z); if (d > rad) return;
+  MON.heardT = now; MON.tx = x; MON.tz = z; MON.rep = 0;
+  if (MON.st === "chase") return;
+  if (d < 8 || rad > 20) startChase(); else { MON.st = "investigate"; MON.path = []; }
+}
+function laser(x, z, rad, src) {
+  if (MON.type !== "B" || MON.wake > 0 || MON.stun > 0 || MON.st === "retreat") return; const d = hyp(MON.x - x, MON.z - z); if (d > rad) return;
+  if (MON.st === "chase" && src === "player") { MON.tx = x; MON.tz = z; return; }
+  if (MON.st === "chase" && hyp(MON.x - P.x, MON.z - P.z) < 3) return;
+  MON.tx = x; MON.tz = z; MON.path = []; MON.rep = 0; if (d < 8 && src === "player") startChase(); else MON.st = "investigate";
+}
+function meet() { MON.met = true; const c = career(); if (!c.met.includes(MON.type)) { c.met += MON.type; saveCareer(c); } }
+function startChase() { if (MON.st !== "chase" && MON.cd <= 0) { MON.cd = 10; if (MON.type === "A") sfx.roar(MON.x, MON.z); else sfx.shriek(MON.x, MON.z); } MON.st = "chase"; MON.lost = 0; MON.vent = false; DIR.quiet = 0; }
+function setDoor(d, open, by) {
+  if (d.jam || (d.target === (open ? 1 : 0))) return; d.target = open ? 1 : 0;
+  if (by === "smash") { d.broken = true; sfx.door(d.x + .5, d.z + .5, true); shake = Math.max(shake, .25 * volAt(hyp(d.x - P.x, d.z - P.z), 20)); }
+  else sfx.door(d.x + .5, d.z + .5, false);
+  if (by === "player") { noise(d.x + .5, d.z + .5, 9); if (open && d === SC.doorCorpse && !d.corpse) { d.corpse = true; scareDrift(d); } }
+}
+function scareDrift(d) {
+  if (now - SC.lastT < 45) { SC.doorCorpse = pick(doors.filter(q => !q.jam && q.target === 0 && q !== d)) || null; return; }
+  SC.lastT = now; const dx = P.x - (d.x + .5), dz = P.z - (d.z + .5), l = hyp(dx, dz) || 1;
+  drift = { x: d.x + .5 - dx / l * .6, z: d.z + .5 - dz / l * .6, y: 1.5, vx: dx / l * 1.5, vz: dz / l * 1.5, t: 0, a: Math.atan2(dz, dx) + 1.2 };
+  setTimeout(() => { if (state === "play") { sfx.sting(.9); shake = .3; hurt = .4; } }, 380);
+}
+function nearest() {
+  if (P.hidden) return { type: "exit" };
+  let best = null, bd = 1e9;
+  for (const it of items) { if (it.taken) continue; const d = hyp(it.x - P.x, it.z - P.z); if (d < 1.5 && d - 1 < bd) { bd = d - 1; best = it; } }
+  for (const k in stations) { const s = stations[k], d = hyp(s.x - P.x, s.z - P.z); if (d < 2.1 && d - .6 < bd) { bd = d - .6; best = s; } }
+  for (const L of lockers) { const d = hyp(L.x - P.x, L.z - P.z); if (d < 1.35 && d < bd) { bd = d; best = L; } }
+  if (MON.st === "dis" && MON.shape === 0) { const d = hyp(MON.x - P.x, MON.z - P.z); if (d < 2.2 && d < bd) { bd = d; best = { type: "fake" }; } }
+  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+  for (const d of doors) { if (d.jam) continue; const vx = d.x + .5 - P.x, vz = d.z + .5 - P.z, dd = hyp(vx, vz); if (dd < 2 && dd > .75 && (vx * fx + vz * fz) / dd > .5 && dd + .4 < bd) { bd = dd + .4; best = d; } }
+  return best;
+}
+function promptFor(o) {
+  if (!o) return "";
+  if (o.type === "exit") return "사물함에서 나가기";
+  if (o.type === "item") return o.kind === "part" ? PARTS[o.id] + " 줍기" : o.kind === "o2" ? "비상 산소통 사용" : o.kind === "beacon" ? "미끼 비콘 줍기" : o.kind === "kit" ? "잠수복 수리 키트 줍기" : "기록 읽기";
+  if (o.type === "locker" || o.type === "fake") return "사물함에 숨기";
+  if (o.type === "station") { const r = ROUTES.find(q => q.id === o.id); if (routeReady(r)) return "길게 눌러 " + r.name + " 기동"; const can = r.needs.filter(n => P.parts[n] && !P.installed[n]); if (can.length) return can.map(n => PARTS[n]).join(", ") + " 설치"; return r.name + " · 필요: " + r.needs.filter(n => !P.installed[n]).map(n => PARTS[n]).join(", "); }
+  return o.target ? "문 닫기" : "문 열기";
+}
+function use() {
+  if (state !== "play") return; const o = nearest(); if (!o) return;
+  if (o.type === "exit") { const L = P.hidden; P.hidden = null; P.x = L.ex; P.z = L.ez; $("slit").hidden = true; sfx.door(P.x, P.z); noise(P.x, P.z, 4); updateHUD(); return; }
+  if (o.type === "item") {
+    o.taken = true; sfx.pick();
+    if (o.kind === "part") { P.parts[o.id] = true; const r = ROUTES.find(q => q.needs.includes(o.id)); toast(`${PARTS[o.id]} 확보 · ${r.name}(${r.where})에 필요`, "g", 5); }
+    else if (o.kind === "o2") { P.o2 = Math.min(100, P.o2 + 30); toast("산소 +30", "g", 3); }
+    else if (o.kind === "beacon") { P.beacons++; toast("미끼 비콘 · F로 던진다", "g", 3); }
+    else if (o.kind === "kit") { if (P.breach) { P.breach = false; toast("잠수복 파열 부위를 막았다", "g", 4); } else { P.kits++; toast("수리 키트 · 잠수복이 찢어지면 자동으로 쓴다", "g", 4); } }
+    else openNote(o.id);
+    updateHUD(); return;
+  }
+  if (o.type === "fake") { mimicAmbush(true); return; }
+  if (o.type === "locker") {
+    if (o === SC.corpseLocker) { SC.corpseLocker = null; SC.lastT = now; sfx.sting(1); shake = .4; hurt = .5; for (let i = 0; i < 900; i++) { const a = rnd() * TAU, r = Math.sqrt(rnd()) * .42, h = rnd(); addPoint(P.x - Math.sin(P.yaw) * .55 + Math.cos(a) * r * .5 + (rnd() - .5) * .1, .35 + h * 1.4 + (h > .85 ? .05 : 0), P.z - Math.cos(P.yaw) * .55 + Math.sin(a) * r * .5, .95, .9, .84, 5, now + h * .12); } toast("사물함 안에서 무언가 쏟아져 나왔다", "w", 3.5); noise(P.x, P.z, 10); return; }
+    P.hidden = o; P.x = o.x; P.z = o.z; P.yaw = Math.atan2(-o.fx, -o.fz); P.pitch = 0; focusing = false; $("slit").hidden = false; sfx.door(P.x, P.z); noise(P.x, P.z, 3.5);
+    const d = hyp(MON.x - P.x, MON.z - P.z); MON.seenHide = MON.st === "chase" && d < 7 && !MON.vent; updateHUD(); return;
+  }
+  if (o.type === "station") {
+    const r = ROUTES.find(q => q.id === o.id), can = r.needs.filter(n => P.parts[n] && !P.installed[n]);
+    if (can.length) { for (const n of can) P.installed[n] = true; sfx.install(); noise(P.x, P.z, 9); toast(can.map(n => PARTS[n]).join(", ") + " 설치" + (routeReady(r) ? " · 기동 준비 완료" : ""), "g", 4); updateHUD(); }
+    else if (!routeReady(r)) sfx.deny();
+    return;
+  }
+  if (o.target) { const cx = Math.floor(P.x), cz = Math.floor(P.z); if (cx === o.x && cz === o.z) return; setDoor(o, false, "player"); } else setDoor(o, true, "player");
+}
+function throwBeacon() {
+  if (state !== "play" || P.hidden) return; if (P.beacons <= 0) { sfx.deny(); toast("비콘이 없다", "s", 2); return; }
+  basis(); MARK = false; castSeg(P.x, EYE, P.z, vF.x, vF.y, vF.z, 9); MARK = true; const t = Math.max(.4, R.t - .35);
+  P.beacons--; beacons.push({ x: P.x + vF.x * t, z: P.z + vF.z * t, life: 12, next: .5 }); nburst(.25, .1, 900, 0, "bandpass", 2400); updateHUD();
+}
+function doPulse() {
+  if (state !== "play" || P.hidden) return; if (P.bat < 20) { sfx.deny(); toast("스캐너 충전 부족", "s", 2); return; }
+  P.scanOn = true; P.bat -= 20; P.idle = 0; sfx.pulse(); pulseT = now;
+  for (let i = 0; i < 7000; i++) { const u = (rnd() * 2 - 1) * (rnd() < .7 ? .55 : 1), a = rnd() * TAU, s = Math.sqrt(1 - u * u); castRay(P.x, EYE, P.z, Math.cos(a) * s, u, Math.sin(a) * s, 22, 2, 24); }
+  laser(P.x, P.z, 32, "player"); noise(P.x, P.z, 5); updateHUD();
+}
+
+// ================================================================ monster
+function monFollow(speed, dt) {
+  if (!MON.path.length) return false;
+  const c = MON.path[0], cx = c % W, cz = (c / W) | 0;
+  if (tile[c] === T_DOOR) { const d = doorAt[c]; if (d.open < .5) { MON.door += dt; if (MON.door > (MON.type === "A" ? .8 : .6)) { MON.door = 0; setDoor(d, true, MON.type === "A" ? "smash" : "mon"); } MON.speed = 0; return true; } }
+  const tx = cx + .5, tz = cz + .5, dx = tx - MON.x, dz = tz - MON.z, d = hyp(dx, dz);
+  if (d < .12) { MON.path.shift(); return MON.path.length > 0; }
+  const s = Math.min(d, speed * dt); MON.x += dx / d * s; MON.z += dz / d * s; turnTo(Math.atan2(dx, dz), dt * 7); MON.speed = speed; return true;
+}
+function turnTo(a, k) { let d = a - MON.yaw; while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU; MON.yaw += d * Math.min(1, k); }
+function goTo(x, z) { MON.path = findPath(MON.x, MON.z, x, z); }
+function fleeFar(rmin, rmax) { for (let i = 0; i < 10; i++) { const c = randomCell(MON.x, MON.z, rmin, rmax); if (!c) continue; goTo(c[0] + .5, c[1] + .5); if (MON.path.length > 6) return true; } return false; }
+function nearestVent(x, z) { let b = vents[0], bd = 1e9; for (const v of vents) { const d = hyp(v.x - x, v.z - z); if (d < bd) { bd = d; b = v; } } return b; }
+function attack() {
+  if (P.inv > 0 || state !== "play") return;
+  if (P.hidden) { const L = P.hidden; P.hidden = null; P.x = L.ex; P.z = L.ez; $("slit").hidden = true; }
+  if (P.breach && P.kits <= 0) { kill(); return; }
+  P.inv = 2; sfx.hit(); sfx.hiss(); shake = .6; hurt = 1; glitch = 1;
+  const d = hyp(P.x - MON.x, P.z - MON.z) || 1; P.kx = (P.x - MON.x) / d * 7; P.kz = (P.z - MON.z) / d * 7;
+  if (P.breach) { P.kits--; toast("다시 찢겼다 · 수리 키트로 막았다 · 남은 키트 " + P.kits, "w", 5); } else { P.breach = true; if (P.kits > 0) { P.kits--; P.breach = false; toast("잠수복이 찢겼다 · 수리 키트로 막았다", "w", 5); } else toast("잠수복 파열 · 산소가 샌다 · 한 번 더 잡히면 끝이다", "w", 6); }
+  MON.stun = 1.2; MON.st = MON.type === "C" ? "flee" : "retreat"; MON.timer = MON.type === "C" ? 5 : 16; MON.path = []; MON.seenHide = false; DIR.menace = 0; DIR.relief = 20;
+  fleeFar(18, 40); updateHUD();
+}
+function kill() {
+  state = "dying"; dyingT = 0; focusing = false; deathWhy = MON.type; quiet();
+  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw); MON.x = P.x + fx * (MON.type === "A" ? 1.5 : .9); MON.z = P.z + fz * (MON.type === "A" ? 1.5 : .9); MON.yaw = Math.atan2(-fx, -fz); MON.st = "kill"; MON.speed = 0; MON.moving = true; MON.vent = false;
+  sfx.sting(1.3); if (MON.type === "A") sfx.roar(MON.x, MON.z); else sfx.shriek(MON.x, MON.z); nburst(2, .8, 6000, 0, "lowpass", 200); setG(AU.staticG, .4, .02);
+}
+function mimicAmbush(sure) {
+  if (MON.st !== "dis") return; MON.st = "windup"; MON.timer = sure ? .05 : .5; MON.sure = !!sure; sfx.sting(.9); sfx.shriek(MON.x, MON.z); shake = .35; if (!MON.met) meet(); MON.seenT = now;
+}
+function mimicPlace() {
+  for (let i = 0; i < 60; i++) {
+    const c = randomCell(P.x, P.z, 5, 13); if (!c) continue; const [x, z] = c, ci = z * W + x;
+    if (blockPath[ci] || losWalk(P.x, P.z, x + .5, z + .5)) continue;
+    let fx = 0, fz = 0; if (isWallT(ci - W)) fz = 1; else if (isWallT(ci + W)) fz = -1; else if (isWallT(ci - 1)) fx = 1; else if (isWallT(ci + 1)) fx = -1; else continue;
+    let bad = false; for (const d of [1, -1, W, -W]) if (tile[ci + d] === T_DOOR) bad = true; if (bad) continue;
+    MON.x = x + .5 - fx * .22; MON.z = z + .5 - fz * .22; MON.yaw = Math.atan2(fx, fz); MON.shape = rnd() < .6 ? 0 : 1; MON.st = "dis"; MON.expo = 0; MON.path = []; MON.fx = fx; MON.fz = fz; return true;
+  }
+  return false;
+}
+function updateMonster(dt) {
+  if (MON.wake > 0) { MON.wake -= dt; MON.speed = 0; MON.moving = false; return; }
+  MON.cd -= dt; MON.lit -= dt; const d = hyp(MON.x - P.x, MON.z - P.z); let speed = 0; MON.speed = 0;
+  // director
+  if (MON.type !== "C") {
+    if (MON.st === "chase" || d < 7) DIR.menace += dt * (MON.st === "chase" ? 1.3 : .6); else DIR.menace = Math.max(0, DIR.menace - dt * .3);
+    DIR.relief -= dt; if (d > 16 && MON.st === "patrol") DIR.quiet += dt; else if (d < 10) DIR.quiet = 0;
+    if (DIR.menace > 34 && MON.st !== "chase" && MON.st !== "retreat") { DIR.menace = 0; DIR.relief = 28; MON.st = "retreat"; MON.timer = 22; fleeFar(20, 45); }
+    if (DIR.quiet > 55 && DIR.relief <= 0) { DIR.quiet = 0; const c = randomCell(P.x, P.z, 7, 13); if (c) { MON.st = "investigate"; MON.tx = c[0] + .5; MON.tz = c[1] + .5; MON.path = []; } }
+  }
+  if (MON.stun > 0) { MON.stun -= dt; buildMon(dt, 0); return; }
+  if (MON.type === "C") { updateMimic(dt, d); return; }
+  if (MON.vent) { MON.timer -= dt; if (MON.timer <= 0) { const v = nearestVent(MON.tx, MON.tz); MON.x = v.x; MON.z = v.z; MON.vent = false; MON.path = []; sfx.clang(v.x, v.z); if (hyp(v.x - P.x, v.z - P.z) < 5) { sfx.sting(.7); shake = .25; } } return; }
+  // senses
+  let detect = false;
+  if (!P.hidden) {
+    if (MON.type === "A") detect = (now - P.noiseT < .6 && d < 6.5) || (d < 1.3 && P.moving);
+    else detect = MON.lit > 0 || (d < 1.4 && P.moving);
+  }
+  if (detect) { if (MON.st !== "chase" && MON.st !== "retreat") startChase(); if (MON.st === "chase") { MON.lost = 0; MON.tx = P.x; MON.tz = P.z; } }
+  if (MON.st === "chase") {
+    speed = MON.type === "A" ? 4.3 : 3.7; if (!detect) MON.lost += dt;
+    if (P.hidden && MON.seenHide) { MON.tx = P.hidden.ex; MON.tz = P.hidden.ez; MON.lost = 0; if (hyp(MON.x - MON.tx, MON.z - MON.tz) < 1.1) { MON.door += dt; if (MON.door > 1.1) { MON.door = 0; sfx.door(P.x, P.z, true); attack(); } } }
+    if (MON.lost > (MON.type === "A" ? 2.6 : 2.2)) { MON.st = "search"; MON.timer = 6; MON.path = []; }
+    else if (!P.hidden && d < 5 && detect && losWalk(MON.x, MON.z, P.x, P.z)) { MON.x += (P.x - MON.x) / d * speed * dt; MON.z += (P.z - MON.z) / d * speed * dt; turnTo(Math.atan2(P.x - MON.x, P.z - MON.z), dt * 9); collide(MON, .3); MON.path = []; MON.speed = speed; }
+    else { MON.rep -= dt; if (MON.rep <= 0 || !MON.path.length) { MON.rep = .4; goTo(MON.tx, MON.tz); } if (!monFollow(speed, dt) && !P.hidden) { MON.lost += dt * 2; } }
+    if (!P.hidden && d < (MON.type === "A" ? 1.05 : .85)) attack();
+  } else if (MON.st === "investigate") {
+    speed = MON.type === "A" ? 2.8 : 3.0; if (!MON.path.length) { goTo(MON.tx, MON.tz); if (MON.type === "B" && MON.path.length > 24) { MON.vent = true; MON.timer = Math.min(9, MON.path.length / 7); MON.path = []; return; } }
+    if (!monFollow(speed, dt)) { MON.st = "search"; MON.timer = 5; MON.path = []; }
+  } else if (MON.st === "search") {
+    speed = 1.8; if (!monFollow(speed, dt)) { const c = randomCell(MON.x, MON.z, 1, 5); if (c) goTo(c[0] + .5, c[1] + .5); } MON.timer -= dt; if (MON.timer <= 0) { MON.st = "patrol"; MON.path = []; }
+  } else if (MON.st === "retreat") {
+    speed = 3.2; monFollow(speed, dt); MON.timer -= dt; if (MON.timer <= 0) { MON.st = "patrol"; MON.path = []; }
+  } else {
+    speed = 1.4; if (!monFollow(speed, dt)) { const c = randomCell(MON.x, MON.z, 8, 30); if (c) goTo(c[0] + .5, c[1] + .5); }
+  }
+  // voice
+  if (MON.type === "A") {
+    MON.stepA += MON.speed * dt; if (MON.stepA > (MON.st === "chase" ? 1.1 : 1.3)) { MON.stepA = 0; sfx.thud(MON.x, MON.z, MON.st === "chase" ? 1 : .7); if (d < 6) shake = Math.max(shake, .06); }
+    MON.call -= dt; if (MON.call <= 0 && MON.st !== "chase") { MON.call = 14 + rnd() * 12; sfx.bellow(MON.x, MON.z); }
+  } else if (d < 16) { MON.tick -= dt; if (MON.tick <= 0) { MON.tick = (MON.st === "chase" ? .05 : .12) + d / 16 * .5 + rnd() * .12; sfx.tick(MON.x, MON.z); } }
+  buildMon(dt, MON.speed);
+}
+function updateMimic(dt, d) {
+  if (MON.st === "gone") { MON.timer -= dt; if (MON.timer <= 0) { if (!mimicPlace()) MON.timer = 4; else MON.timer = 26 + rnd() * 22; } return; }
+  if (MON.st === "dis") {
+    if (MON.fHit) MON.expo += dt * .85; else MON.expo = Math.max(0, MON.expo - dt * .25);
+    MON.breath -= dt; if (MON.breath <= 0) { MON.breath = 2.3 + rnd(); sfx.wet(MON.x, MON.z); }
+    if (MON.expo >= 1) { MON.st = "flee"; MON.timer = 5; sfx.shriek(MON.x, MON.z); shake = .2; if (!MON.met) meet(); MON.seenT = now; toast("그것이 모습을 드러내고 달아났다", "w", 4); fleeFar(14, 30); }
+    else if (!P.hidden && d < 1.75) mimicAmbush(false);
+    else { MON.timer -= dt; if (MON.timer <= 0 && d > 7 && now - MON.seenT > 5 && !losWalk(P.x, P.z, MON.x, MON.z)) { MON.st = "gone"; MON.timer = 1 + rnd() * 3; } }
+  } else if (MON.st === "windup") {
+    MON.timer -= dt; turnTo(Math.atan2(P.x - MON.x, P.z - MON.z), dt * 12);
+    if (MON.timer <= 0) { if (MON.sure || d < 2.7) attack(); else { MON.st = "hunt"; MON.timer = 6; } }
+  } else if (MON.st === "hunt") {
+    MON.timer -= dt; const sp = 3.7; MON.rep -= dt; if (MON.rep <= 0 || !MON.path.length) { MON.rep = .35; goTo(P.x, P.z); }
+    if (!P.hidden && d < 4 && losWalk(MON.x, MON.z, P.x, P.z)) { MON.x += (P.x - MON.x) / d * sp * dt; MON.z += (P.z - MON.z) / d * sp * dt; turnTo(Math.atan2(P.x - MON.x, P.z - MON.z), dt * 9); collide(MON, .3); MON.speed = sp; } else monFollow(sp, dt);
+    if (!P.hidden && d < .85) attack(); else if (MON.timer <= 0 || P.hidden) { MON.st = "flee"; MON.timer = 4; fleeFar(12, 30); }
+  } else if (MON.st === "flee") { MON.timer -= dt; if (!monFollow(4.6, dt) || MON.timer <= 0) { MON.st = "gone"; MON.timer = 16 + rnd() * 14; } }
+  MON.fHit = false; buildMon(dt, MON.speed);
+}
+const MS = []; for (let i = 0; i < 40; i++) MS.push({ x: 0, y: -50, z: 0, r: .1, kind: K.MON, ref: MON });
+let msN = 0;
+function buildMon(dt, speed) {
+  MON.moving = speed > .2 || MON.st === "kill" || MON.st === "windup"; MON.phase += (speed + (MON.st === "kill" ? 3 : 0)) * dt * 2.2;
+  const L = [], s = Math.sin(MON.phase), tw = (rnd() - .5) * (MON.st === "kill" ? .12 : .03);
+  if (MON.type === "A") {
+    L.push([0, 1.05, 0, .55], [0, 1.15, .55, .5], [0, 1.0, -.6, .48], [0, .92, -1.1, .34], [tw, 1.25, 1.1, .4], [tw, 1.0 - Math.abs(s) * .1, 1.45, .25], [0, .72, 1.0, .3]);
+    for (const sd of [-1, 1]) { const w = s * .26 * sd; L.push([.5 * sd, .75, .6 + w, .2], [.58 * sd, .42, .7 + w * 1.4, .16], [.6 * sd, .13, .8 + w * 1.6, .17], [.5 * sd, .7, -.7 - w, .2], [.56 * sd, .36, -.8 - w * 1.4, .16], [.58 * sd, .13, -.85 - w * 1.6, .17]); }
+  } else if (MON.type === "B") {
+    const drop = MON.st === "kill" ? .9 : MON.st === "chase" ? .25 : 0;
+    L.push([0, 2.32 - drop * .4, 0, .26], [0, 2.38, -.42, .22], [0, 2.42, -.8, .16], [tw, 2.05 - drop, .3, .17], [tw, 1.9 - drop, .42, .1]);
+    for (let k = 0; k < 6; k++) { const a = k * TAU / 6 + .5 + Math.sin(MON.phase + k * 1.9) * .3, r2 = .95 + .15 * Math.sin(MON.phase * 1.3 + k * 2.1); L.push([Math.cos(a) * .55, 2.52, Math.sin(a) * .55, .09], [Math.cos(a) * r2, 2.57, Math.sin(a) * r2, .075], [Math.cos(a + .2) * (r2 + .3), 2.62, Math.sin(a + .2) * (r2 + .3), .06]); }
+    if (drop > 0) for (const sd of [-1, 1]) L.push([.25 * sd, 1.95 - drop * .6, .55, .09], [.3 * sd, 1.65 - drop * .6, .75, .08], [.3 * sd, 1.4 - drop * .6, .92, .1]);
+  } else {
+    for (const sd of [-1, 1]) { const lift = sd * s; L.push([.14 * sd, 1.05, 0, .13], [.15 * sd, .8, lift * .1, .11], [.15 * sd, .55, lift * .18 + .05, .1], [.16 * sd, .3, lift * .25, .09], [.16 * sd, .1, lift * .3 + .08, .1]); const sw = .5 - sd * s * .2; L.push([.36 * sd, 1.86, .1, .11], [.44 * sd, 1.6, .1 + sw * .4, .08], [.5 * sd, 1.36, .12 + sw * .8, .075], [.52 * sd, 1.2, .14 + sw * 1.2, .07], [.5 * sd, 1.1, .2 + sw * 1.5, .09]); }
+    L.push([0, 1.17, 0, .2], [0, 1.45, .05, .21], [0, 1.74, .12, .27], [0, 2.0, .24, .09], [tw, 2.19, .37, .19], [tw * .8, 2.0, .52, .11]);
+  }
+  const c = Math.cos(MON.yaw), sn = Math.sin(MON.yaw); msN = L.length;
+  for (let i = 0; i < msN; i++) { const o = MS[i], p = L[i]; o.x = MON.x + p[0] * c + p[2] * sn; o.z = MON.z - p[0] * sn + p[2] * c; o.y = p[1]; o.r = p[3]; }
+}
+function buildDyn() {
+  dyn.length = 0; dbox.length = 0;
+  const vis = MON.wake <= 0 && !MON.vent && MON.st !== "gone";
+  if (vis) {
+    if (MON.type === "C" && MON.st === "dis") { const h = MON.shape === 0 ? 1.95 : .8, hw = MON.shape === 0 ? .44 : .38, hd = MON.shape === 0 ? .28 : .36, ax = Math.abs(MON.fx) > .5; dbox.push({ x0: MON.x - (ax ? hd : hw), x1: MON.x + (ax ? hd : hw), y0: 0, y1: h, z0: MON.z - (ax ? hw : hd), z1: MON.z + (ax ? hw : hd), kind: MON.shape === 0 ? K.LOCKER : K.CRATE, ref: MON }); }
+    else for (let i = 0; i < msN; i++) dyn.push(MS[i]);
+  }
+  for (const d of debris) dyn.push({ x: d.x, y: d.y, z: d.z, r: d.r, kind: K.DEBRIS, ref: null });
+  for (const it of items) if (!it.taken) dyn.push({ x: it.x, y: .2, z: it.z, r: it.kind === "part" ? .2 : .15, kind: K.ITEM, ref: it });
+  if (drift) { const c = Math.cos(drift.a), s = Math.sin(drift.a); for (const [q, r] of [[-.5, .13], [-.2, .2], [.1, .19], [.4, .14], [.66, .11]]) dyn.push({ x: drift.x + c * q, y: drift.y + q * .2, z: drift.z + s * q, r, kind: K.DEBRIS, ref: null }); }
+}
+
+// ================================================================ player
+const clampPush = (o, r, x0, z0, x1, z1) => { const nx = clamp(o.x, x0, x1), nz = clamp(o.z, z0, z1), dx = o.x - nx, dz = o.z - nz, d2 = dx * dx + dz * dz; if (d2 < r * r && d2 > 1e-9) { const d = Math.sqrt(d2); o.x = nx + dx / d * r; o.z = nz + dz / d * r; } };
+function collide(o, r) {
+  const cx = Math.floor(o.x), cz = Math.floor(o.z);
+  for (let z = cz - 1; z <= cz + 1; z++) for (let x = cx - 1; x <= cx + 1; x++) {
+    if (solidAt(x, z)) { clampPush(o, r, x, z, x + 1, z + 1); continue; }
+    const L = obsCell[z * W + x]; if (L) for (const b of L) { if (!b.solid) continue; if (b.s === 0) { if (b.y0 < 1.5) clampPush(o, r, b.x0, b.z0, b.x1, b.z1); } else if (b.s === 1) { const dx = o.x - b.x, dz = o.z - b.z, d2 = dx * dx + dz * dz, m = r + b.r; if (d2 < m * m && d2 > 1e-9) { const d = Math.sqrt(d2); o.x = b.x + dx / d * m; o.z = b.z + dz / d * m; } } }
+  }
+  if (o === P) for (const b of dbox) clampPush(o, r, b.x0, b.z0, b.x1, b.z1);
+}
+const vF = new THREE.Vector3(), vR = new THREE.Vector3(), vU = new THREE.Vector3();
+function updateCamera() {
+  let sx = 0, sy = 0; if (shake > 0 && !reduceMotion) { sx = (rnd() - .5) * shake * .12; sy = (rnd() - .5) * shake * .12; }
+  camera.position.set(P.x + sx, EYE + Math.sin(P.bob * TAU) * .022 + sy, P.z); camera.rotation.set(P.pitch, P.yaw, P.breach ? Math.sin(now * 1.3) * .012 : 0);
+}
+function basis() { camera.updateMatrixWorld(); const e = camera.matrixWorld.elements; vR.set(e[0], e[1], e[2]); vU.set(e[4], e[5], e[6]); vF.set(-e[8], -e[9], -e[10]); EM.set(P.x, EYE, P.z).addScaledVector(vR, .16).addScaledVector(vU, -.2).addScaledVector(vF, .12); }
+function updatePlayer(dt) {
+  const turn = (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0); P.yaw -= turn * 2.2 * dt;
+  if (keys.ArrowUp) P.pitch = clamp(P.pitch + 1.2 * dt, -1.4, 1.4); if (keys.ArrowDown) P.pitch = clamp(P.pitch - 1.2 * dt, -1.4, 1.4);
+  let f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+  if (P.hidden) { f = s = 0; }
+  P.moving = !!(f || s); P.sprint = P.moving && !!(keys.ShiftLeft || keys.ShiftRight) && !P.sneak;
+  const sp = P.sneak ? 1.15 : P.sprint ? 3.9 : 2.3;
+  P.kx *= Math.pow(.01, dt); P.kz *= Math.pow(.01, dt);
+  let mx = P.kx * dt, mz = P.kz * dt;
+  if (P.moving) { const l = hyp(f, s), fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw); mx += (fx * f + rx * s) / l * sp * dt; mz += (fz * f + rz * s) / l * sp * dt; P.bob += dt * sp * .55; P.step += sp * dt; }
+  if (!P.hidden) { const n = Math.max(1, Math.ceil(hyp(mx, mz) / .2)); for (let i = 0; i < n; i++) { P.x += mx / n; P.z += mz / n; collide(P, .3); } }
+  if (P.step > (P.sprint ? 1.25 : .95)) { P.step = 0; if (!P.sneak) { sfx.step(P.sprint ? 1 : .6); noise(P.x, P.z, P.sprint ? 14 : 5.5); P.noiseT = now; } else sfx.step(.15); }
+  if (P.inv > 0) P.inv -= dt;
+  const drain = 100 / (13 * 60) * (P.sprint ? 2.6 : 1) * (P.breach ? 1.9 : 1); P.o2 -= drain * dt;
+  if (P.o2 <= 0) { P.o2 = 0; state = "dying"; dyingT = 0; deathWhy = "o2"; quiet(); return; }
+  exert += ((P.sprint ? 1 : MON.st === "chase" ? .8 : P.o2 < 20 ? .7 : 0) - exert) * Math.min(1, dt * .8);
+  breathT -= dt; if (breathT <= 0) { P.inh = !P.inh; breathT = (P.inh ? 1.5 : 2.1) * (1 - exert * .55); sfx.breath(P.inh, .7 + exert * .9); }
+  const r = roomAt(P.x, P.z); if (r && r !== curRoom) setPlace(r);
+}
+const tmp = { x: 0, y: 0, z: 0 };
+function dirFrom(ax, ay) { tmp.x = vF.x + vR.x * ax + vU.x * ay; tmp.y = vF.y + vR.y * ax + vU.y * ay; tmp.z = vF.z + vR.z * ax + vU.z * ay; const l = hyp(tmp.x, tmp.y, tmp.z); tmp.x /= l; tmp.y /= l; tmp.z /= l; }
+let focusAcc = 0, ringAcc = 0;
+function updateScan(dt) {
+  lCount = 0; let snd = 0; MON.fHit = MON.fHit || false;
+  if (P.scanOn && !P.hidden) {
+    if (focusing && P.bat > 0) {
+      P.bat = Math.max(0, P.bat - 4 * dt); P.idle = 0; snd = .03; basis();
+      const m = Math.round(70 * Math.min(3, dt * 60)), tc = Math.tan(P.cone);
+      for (let i = 0; i < m; i++) { const r = tc * Math.sqrt(rnd()), ph = rnd() * TAU; dirFrom(r * Math.cos(ph), r * Math.sin(ph)); castRay(P.x, EYE, P.z, tmp.x, tmp.y, tmp.z, 22, 1, 0, i % 3 === 0); }
+      focusAcc += dt; if (focusAcc > .4) { focusAcc = 0; laser(P.x, P.z, 15, "player"); }
+    }
+  }
+  setG(AU.scanG, snd, .03);
+  if (!focusing) { P.idle += dt; if (P.idle > .8) P.bat = Math.min(100, P.bat + 8 * dt); }
+  laPos.needsUpdate = true; laCol.needsUpdate = true; lGeo.setDrawRange(0, lCount * 2); lasers.material.opacity = .2 + rnd() * .16;
+  for (let i = beacons.length - 1; i >= 0; i--) {
+    const b = beacons[i]; b.life -= dt; b.next -= dt;
+    if (rnd() < .5) addPoint(b.x + (rnd() - .5) * .08, .08 + rnd() * .1, b.z + (rnd() - .5) * .08, 1, .9, .4, .5, now);
+    if (b.next <= 0) { b.next = 1.3; for (let k = 0; k < 520; k++) { const u = rnd() * .95, a = rnd() * TAU, s = Math.sqrt(1 - u * u); castRay(b.x, .25, b.z, Math.cos(a) * s, u, Math.sin(a) * s, 8, 3, 16); } sfx.beacon(b.x, b.z); noise(b.x, b.z, 17); laser(b.x, b.z, 20, "beacon"); if (MON.type === "C" && MON.st === "dis" && hyp(MON.x - b.x, MON.z - b.z) < 7) MON.expo += .4; }
+    if (b.life <= 0) beacons.splice(i, 1);
+  }
+}
+function updateWorld(dt) {
+  for (const d of doors) { const was = d.open; d.open = clamp(d.open + (d.target ? 1 : -1) * dt * 2.6, 0, 1); if ((was < .5) !== (d.open < .5)) { erasePoints(d.x - .05, d.x + 1.05, d.z - .05, d.z + 1.05); } d.mesh.visible = d.jam || d.open < .5; }
+  for (const d of debris) { const nx = d.x + d.vx * dt, nz = d.z + d.vz * dt; if (solidAt(Math.floor(nx + Math.sign(d.vx) * d.r), Math.floor(d.z)) || tile[Math.floor(d.z) * W + Math.floor(nx)] !== T_FLOOR) d.vx = -d.vx; else d.x = nx; if (solidAt(Math.floor(d.x), Math.floor(nz + Math.sign(d.vz) * d.r)) || tile[Math.floor(nz) * W + Math.floor(d.x)] !== T_FLOOR) d.vz = -d.vz; else d.z = nz; d.y = clamp(d.y + Math.sin(now * .4 + d.x) * dt * .05, .3, 2.4); }
+  if (drift) { drift.t += dt; drift.x += drift.vx * dt; drift.z += drift.vz * dt; drift.vx *= Math.pow(.35, dt); drift.vz *= Math.pow(.35, dt); drift.a += dt * .5; drift.y = Math.min(2.35, drift.y + dt * .12); if (solidAt(Math.floor(drift.x), Math.floor(drift.z))) { drift.vx = -drift.vx; drift.vz = -drift.vz; drift.x += drift.vx * dt * 2; drift.z += drift.vz * dt * 2; } }
+  if (!SC.shiftDone && runTime > SC.shiftT && now - SC.lastT > 30) { SC.shiftDone = true; SC.lastT = now; sfx.groan(); shake = 1.2; toast("선체가 기운다", "s", 4); for (const d of debris) { d.vx += (rnd() - .5) * .8; d.vz += (rnd() - .5) * .8; } noise(P.x, P.z, 0); }
+}
+function update(dt) {
+  runTime += dt; updateWorld(dt); buildDyn(); updatePlayer(dt); if (state !== "play") return;
+  updateCamera(); updateScan(dt); updateMonster(dt); if (state !== "play") return;
+  // interaction prompt + station hold
+  const o = nearest(), pr = $("prompt"), txt = promptFor(o);
+  if (txt) { pr.hidden = false; if (pr.dataset.t !== txt) { pr.dataset.t = txt; pr.innerHTML = "<kbd>E</kbd>"; pr.append(txt); } } else pr.hidden = true;
+  let holding = false;
+  if (o && o.type === "station" && keys.KeyE) { const r = ROUTES.find(q => q.id === o.id); if (routeReady(r)) { holding = true; if (holdId !== r.id) { holdId = r.id; holdProg = 0; toast(r.name + " 기동 시작 · 손을 떼지 마라", "s", 4); if (MON.type === "C" && (MON.st === "dis" || MON.st === "gone")) { if (MON.st === "gone") { const c = randomCell(P.x, P.z, 9, 14); if (c) { MON.x = c[0] + .5; MON.z = c[1] + .5; } } MON.st = "hunt"; MON.timer = 30; sfx.shriek(MON.x, MON.z); } }
+      holdProg += dt / r.hold; ringAcc += 0; if (frac(now) < dt) { noise(P.x, P.z, 60); laser(P.x, P.z, 60, "player"); }
+      if (AU.ctx) AU.op.frequency.setTargetAtTime(50 + holdProg * 90, AU.ctx.currentTime, .1); setG(AU.opG, .12); shake = Math.max(shake, .05);
+      if (holdProg >= 1) { win(r); return; } } }
+  if (!holding) { holdProg = Math.max(0, holdProg - dt * .15); if (holdProg <= 0) holdId = null; setG(AU.opG, 0); }
+  $("hold").hidden = holdProg <= 0; if (holdProg > 0) $("holdFill").style.width = holdProg * 100 + "%";
+  // fear feedback
+  const d = MON.wake > 0 || MON.vent || MON.st === "gone" || MON.st === "dis" ? 99 : hyp(MON.x - P.x, MON.z - P.z);
+  const near = clamp(1 - d / 9, 0, 1); glitch = Math.max(glitch - dt * 1.5, MON.st === "chase" || MON.st === "hunt" ? near * .45 : 0);
+  beatT -= dt; const fear = Math.max(near, P.o2 < 15 ? .8 : 0, MON.st === "chase" ? .6 : 0); if (fear > .15 && beatT <= 0) { beatT = 1.1 - fear * .65; sfx.beat(); }
+  hurt = Math.max(0, hurt - dt * .8); shake = Math.max(0, shake - dt * 1.2);
+  $("hurt").style.opacity = String(Math.max(hurt, P.breach ? .22 + .08 * Math.sin(now * 3) : 0, P.o2 < 15 ? .35 : 0));
+  black = P.o2 < 12 ? (1 - P.o2 / 12) * .55 : 0; $("black").style.opacity = String(black);
+  setG(AU.staticG, glitch * .08);
+  hudAcc += dt; if (hudAcc > .15) { hudAcc = 0; updateHUD(); }
+}
+let hudAcc = 0;
+function updateDying(dt) {
+  dyingT += dt;
+  if (deathWhy === "o2") { black = Math.min(1, dyingT / 2.5); $("black").style.opacity = String(black); P.pitch += (-.9 - P.pitch) * dt; updateCamera(); if (dyingT > 3) finishDeath(); return; }
+  glitch = 1; const tp = MON.type === "A" ? .15 : MON.type === "B" ? .75 : .55; P.pitch += (tp - P.pitch) * Math.min(1, dt * 7);
+  shake = .5; updateCamera(); basis(); buildMon(dt, 0); buildDyn(); lCount = 0;
+  if (dyingT < 1.5) for (let i = 0; i < 300; i++) { const r = Math.tan(.8) * Math.sqrt(rnd()), ph = rnd() * TAU; dirFrom(r * Math.cos(ph), r * Math.sin(ph)); castRay(P.x, EYE, P.z, tmp.x, tmp.y, tmp.z, 8, 2, 0, i % 5 === 0); }
+  laPos.needsUpdate = true; laCol.needsUpdate = true; lGeo.setDrawRange(0, lCount * 2);
+  $("hurt").style.opacity = String(.6 + rnd() * .4); if (dyingT > 2.2) finishDeath();
+}
+const fmt = s => `${Math.floor(s / 60)}분 ${String(Math.floor(s % 60)).padStart(2, "0")}초`;
+function finishDeath() {
+  state = "dead"; show("dead"); unlock(); setG(AU.staticG, .02, .6); $("black").style.opacity = "0"; $("hurt").style.opacity = "0";
+  const msg = { o2: ["산소가 떨어졌다", "숨을 들이쉬어도 들어오는 것이 없었다. 헬멧 안쪽에 김이 서리고, 라이다의 점이 하나씩 꺼졌다."], A: ["울대에게 잡혔다", "그것은 끝까지 당신을 보지 못했다. 볼 필요가 없었다. 당신의 숨소리로 충분했다."], B: ["천장꾼에게 잡혔다", "위에서 내려온 것이 헬멧을 감쌌다. 마지막으로 찍힌 점은 전부 붉은색이었다."], C: ["흉내에게 잡혔다", "사물함이 아니었다. 상자도 아니었다. 처음부터 그 자리에 있던 것도 아니었다."] }[deathWhy];
+  $("deadTitle").textContent = msg[0]; $("deadMsg").textContent = msg[1];
+  $("deadStats").innerHTML = `잠수 시간 ${fmt(runTime)} · 설치한 부품 ${Object.keys(P.installed).length} / 6<br>이번 잠수의 개체: ${MON.met || deathWhy !== "o2" ? MON_NAME[MON.type] : "끝내 마주치지 못했다"}`;
+  $("btnRetry").focus();
+}
+function win(r) {
+  state = "won"; wonRoute = r; quiet(); unlock(); sfx.win(); show("won"); $("black").style.opacity = "0"; $("hurt").style.opacity = "0";
+  const c = career(); c.escapes++; if (!c.best || runTime < c.best) c.best = runTime; saveCareer(c);
+  $("wonEyebrow").textContent = r.name + " 탈출";
+  $("wonMsg").textContent = { sub: "잠수정이 문풀을 빠져나와 떠오르기 시작한다. 선체가 멀어지고, 라이다에는 아무것도 찍히지 않는다. 물뿐이다. 그게 이렇게 반가울 줄은 몰랐다.", capsule: "분리 핀이 빠지고 캡슐이 튀어 오른다. 몸이 좌석에 눌린다. 3,800미터를 올라가는 데 아홉 분이 걸린다. 그동안 캡슐 바깥을 두드리는 소리는 한 번도 나지 않았다.", winch: "윈치가 케이블을 감아올린다. 조타실 천장이 뜯겨 나가고 몸이 위로 끌려간다. 아래에서 흑조호가 점 몇 개로 줄어들다가 사라진다." }[r.id];
+  $("wonStats").innerHTML = `잠수 시간 ${fmt(runTime)} · 남은 산소 ${Math.ceil(P.o2)}%<br>이번 잠수의 개체: ${MON.met ? MON_NAME[MON.type] : "끝내 마주치지 못했다"} · 주운 기록 ${P.notes.size} / ${NNOTES}`;
+  $("btnAgain").focus();
+}
+function toTitle() {
+  state = "title"; show("title"); unlock(); quiet(); setG(AU.staticG, 0); $("slit").hidden = true; $("black").style.opacity = "0"; $("hurt").style.opacity = "0";
+  const c = career(); $("career").textContent = c.dives ? `잠수 ${c.dives}회 · 탈출 ${c.escapes}회` + (c.best ? ` · 최단 ${fmt(c.best)}` : "") + (c.met ? ` · 마주친 개체: ${c.met.split("").sort().map(t => MON_NAME[t]).join(", ")}` : "") : "";
+  for (const d of doors) { d.jam = false; d.open = 0; d.target = 0; d.mesh.visible = true; }
+  items = []; debris = []; beacons = []; drift = null; MON.wake = 999; P.hidden = null; P.x = DATA.start[0] + .5; P.z = DATA.start[1] + .5; P.yaw = Math.PI; P.pitch = 0; P.breach = false;
+  clearPoints(); buildDyn(); updateCamera();
+  for (let i = 0; i < 5000; i++) { const u = rnd() * 2 - 1, a = rnd() * TAU, s = Math.sqrt(1 - u * u); castRay(P.x, EYE, P.z, Math.cos(a) * s, u, Math.sin(a) * s, 16, 2, 0); }
+}
+
+// ================================================================ map
+function drawMap() {
+  const c = $("mapcv"), w = innerWidth, h = innerHeight; c.width = w * DPR; c.height = h * DPR; const g = c.getContext("2d"); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const s = Math.max(3, Math.floor(Math.min((w - 32) / W, (h - 110) / H))), ox = Math.round((w - W * s) / 2), oy = Math.round((h - 60 - H * s) / 2) + 10;
+  const colr = ["", "#0a2428", "#52c4b8", "#58d98a", "#2c5a86", "#e0963c"];
+  for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) { const k = known[z * W + x]; if (k) { g.fillStyle = colr[k]; g.fillRect(ox + x * s, oy + z * s, s, s); } }
+  g.textAlign = "center"; g.textBaseline = "middle"; g.font = `${Math.max(10, s * 1.7)}px "IBM Plex Sans KR",sans-serif`;
+  for (const L of lockers) if (L.found) { g.fillStyle = "#8fb4c4"; g.fillRect(ox + L.x * s - s * .35, oy + L.z * s - s * .6, s * .7, s * 1.2); }
+  for (const it of items) if (it.found && !it.taken) { g.fillStyle = "#ffe14d"; g.beginPath(); g.arc(ox + it.x * s, oy + it.z * s, Math.max(2, s * .5), 0, TAU); g.fill(); }
+  for (const k in stations) { const st = stations[k]; if (st.found) { g.fillStyle = routeReady(ROUTES.find(r => r.id === k)) ? "#86ffb4" : "#ffb648"; g.fillText("◆", ox + st.x * s, oy + st.z * s); } }
+  g.fillStyle = "rgba(207,230,228,.55)"; g.font = `${clamp(s * 1.5, 10, 15)}px "IBM Plex Sans KR",sans-serif`; const seen = new Set();
+  for (const r of ROOMS) { if (seen.has(r[0])) continue; let any = false; for (let z = r[2] + 1; z < r[4] && !any; z++) for (let x = r[1] + 1; x < r[3]; x++) if (known[z * W + x]) { any = true; break; } if (any) { seen.add(r[0]); g.fillText(r[0], ox + (r[1] + r[3] + 1) / 2 * s, oy + (r[2] + r[4] + 1) / 2 * s); } }
+  g.save(); g.translate(ox + P.x * s, oy + P.z * s); g.rotate(-P.yaw); g.fillStyle = "#fff"; g.beginPath(); g.moveTo(0, -s * 1.7); g.lineTo(s * 1.1, s * 1.2); g.lineTo(-s * 1.1, s * 1.2); g.closePath(); g.fill(); g.restore();
+}
+function toggleMap() { if (state === "play") { state = "map"; show("mapscr"); drawMap(); quiet(); } else if (state === "map") { state = "play"; show(null); for (const k in keys) keys[k] = false; focusing = false; } }
+
+// ================================================================ input
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion:reduce)").matches;
+document.addEventListener("pointerlockchange", () => { const locked = document.pointerLockElement === cv; if (locked) { wasLocked = true; everLocked = true; lockFailed = false; } else if (wasLocked && state === "play") { wasLocked = false; openPause(); } });
+document.addEventListener("pointerlockerror", () => { if (!everLocked) lockFailed = true; });
+cv.addEventListener("contextmenu", e => e.preventDefault());
+cv.addEventListener("mousedown", e => {
+  if (state !== "play") return; if (!document.pointerLockElement && !lockFailed) requestLock();
+  if (e.button === 0 && !P.hidden) { focusing = true; if (!P.scanOn) { P.scanOn = true; updateHUD(); } } else if (e.button === 2) doPulse();
+});
+window.addEventListener("mouseup", e => { if (e.button === 0) focusing = false; });
+window.addEventListener("mousemove", e => { if (state !== "play") return; if (document.pointerLockElement || lockFailed) { P.yaw -= e.movementX * .0021; P.pitch = clamp(P.pitch - e.movementY * .0021, -1.4, 1.4); } });
+window.addEventListener("wheel", e => { if (state === "play") { P.cone = clamp(P.cone + Math.sign(e.deltaY) * .035, .06, .6); updateHUD(); } }, { passive: true });
+window.addEventListener("keydown", e => {
+  if (e.code === "Tab") { e.preventDefault(); if (!e.repeat) toggleMap(); return; }
+  if (e.code === "Escape") { if (state === "play") openPause(); else if (state === "paused") resume(); else if (state === "note") closeNote(); else if (state === "map") toggleMap(); return; }
+  if (state === "note") { if ((e.code === "KeyE" || e.code === "Enter") && !e.repeat && e.target.tagName !== "BUTTON") { e.preventDefault(); closeNote(); } return; }
+  if (state !== "play") return; keys[e.code] = true; if (e.repeat) return;
+  if (e.code === "KeyE") use(); else if (e.code === "Space") { e.preventDefault(); doPulse(); } else if (e.code === "KeyF") throwBeacon();
+  else if (e.code === "KeyC") { P.sneak = !P.sneak; updateHUD(); }
+});
+window.addEventListener("keyup", e => { keys[e.code] = false; });
+window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; focusing = false; });
+$("btnStart").addEventListener("click", newRun); $("btnRetry").addEventListener("click", newRun); $("btnAgain").addEventListener("click", newRun);
+$("btnDeadTitle").addEventListener("click", toTitle); $("btnWonTitle").addEventListener("click", toTitle); $("btnQuit").addEventListener("click", toTitle);
+$("btnResume").addEventListener("click", resume); $("btnNoteClose").addEventListener("click", closeNote); $("mapscr").addEventListener("click", toggleMap);
+$("btnMute").addEventListener("click", () => { muted = !muted; $("btnMute").textContent = muted ? "소리 켜기" : "소리 끄기"; if (AU.ctx) { if (muted) AU.ctx.suspend(); else AU.ctx.resume(); } });
+
+// ================================================================ loop
+const stc = $("static"), stx = stc.getContext("2d"), stImg = stx.createImageData(128, 72);
+function drawStatic(a) { stc.style.opacity = String(a); if (a < .01) return; const d = stImg.data; for (let i = 0; i < d.length; i += 4) { const v = rnd() < .5 ? 0 : (rnd() * 255) | 0; d[i] = v * .6; d[i + 1] = v; d[i + 2] = v * .9; d[i + 3] = 255; } stx.putImageData(stImg, 0, 0); }
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); if (state === "map") drawMap(); }
+window.addEventListener("resize", resize); resize();
+let last = performance.now();
+function frame(t) {
+  const dt = Math.min(.05, (t - last) / 1000); last = t;
+  if (state === "play") { now += dt; update(dt); }
+  else if (state === "dying") { now += dt; updateDying(dt); }
+  else if (state === "title") { now += dt; P.yaw += dt * .04; updateCamera(); lCount = 0; lGeo.setDrawRange(0, 0); glitch = 0; }
+  else if (state === "dead") { now += dt; glitch = Math.max(0, glitch - dt * .3); lGeo.setDrawRange(0, 0); }
+  pMat.uniforms.uTime.value = now; pMat.uniforms.uGlitch.value = glitch;
+  drawStatic(state === "dying" && deathWhy !== "o2" ? .3 + rnd() * .3 : glitch * glitch * .2);
+  flushPoints(); renderer.render(scene, camera); requestAnimationFrame(frame);
+}
+toTitle(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
